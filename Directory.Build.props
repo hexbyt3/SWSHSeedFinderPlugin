@@ -8,7 +8,7 @@
 
     <!-- Auto-detect PKHeX version from the referenced DLL -->
     <Target Name="GetPKHeXVersion" BeforeTargets="GetAssemblyVersion;GenerateNuspec;Build">
-        <GetAssemblyIdentity AssemblyFiles="$(MSBuildThisFileDirectory)SVSeedFinderPlugin\Deps\PKHeX.Core.dll">
+        <GetAssemblyIdentity AssemblyFiles="$(MSBuildThisFileDirectory)SWSHSeedFinderPlugin\Deps\PKHeX.Core.dll">
             <Output TaskParameter="Assemblies" ItemName="PKHeXAssembly"/>
         </GetAssemblyIdentity>
         <PropertyGroup>
