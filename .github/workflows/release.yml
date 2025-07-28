@@ -2,7 +2,7 @@ name: Build and Release
 on:
   push:
     paths:
-      - "SVSeedFinderPlugin/Deps/PKHeX.Core.dll"
+      - "SWSHSeedFinderPlugin/Deps/PKHeX.Core.dll"
   workflow_dispatch:
 permissions:
   contents: write
@@ -16,14 +16,14 @@ jobs:
         with:
           dotnet-version: '9.0.x'
       - name: Restore dependencies
-        run: dotnet restore SVSeedFinderPlugin.sln
+        run: dotnet restore SWSHSeedFinderPlugin.sln
       - name: Build
-        run: dotnet build SVSeedFinderPlugin.sln -c Release --no-restore
+        run: dotnet build SWSHSeedFinderPlugin.sln -c Release --no-restore
       - name: Extract version from PKHeX.Core.dll
         id: ver
         shell: pwsh
         run: |
-          $dll = "SVSeedFinderPlugin/Deps/PKHeX.Core.dll"
+          $dll = "SWSHSeedFinderPlugin/Deps/PKHeX.Core.dll"
           $version = [System.Reflection.Assembly]::LoadFrom((Resolve-Path $dll)).GetName().Version
           $versionString = "$($version.Major).$($version.Minor).$($version.Build)"
           echo "version=$versionString" >> $env:GITHUB_OUTPUT
@@ -31,7 +31,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: "v${{ steps.ver.outputs.version }}"
-          name: "SV Seed Finder ${{ steps.ver.outputs.version }}"
+          name: "SWSH Seed Finder ${{ steps.ver.outputs.version }}"
           body: "Automated release for version ${{ steps.ver.outputs.version }}"
           files: |
-            SVSeedFinderPlugin/bin/Release/net9.0-windows/SVSeedFinderPlugin.dll
+            SWSHSeedFinderPlugin/bin/Release/net9.0-windows/SWSHSeedFinderPlugin.dll
