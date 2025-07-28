@@ -1,0 +1,21 @@
+<Project>
+    <PropertyGroup>
+        <LangVersion>12</LangVersion>
+        <Nullable>enable</Nullable>
+        <NeutralLanguage>en</NeutralLanguage>
+        <SourceRevisionId>$([System.DateTime]::UtcNow.ToString("yyMMddHHmmss"))</SourceRevisionId>
+    </PropertyGroup>
+
+    <!-- Auto-detect PKHeX version from the referenced DLL -->
+    <Target Name="GetPKHeXVersion" BeforeTargets="GetAssemblyVersion;GenerateNuspec;Build">
+        <GetAssemblyIdentity AssemblyFiles="$(MSBuildThisFileDirectory)SVSeedFinderPlugin\Deps\PKHeX.Core.dll">
+            <Output TaskParameter="Assemblies" ItemName="PKHeXAssembly"/>
+        </GetAssemblyIdentity>
+        <PropertyGroup>
+            <Version>%(PKHeXAssembly.Version)</Version>
+            <AssemblyVersion>%(PKHeXAssembly.Version)</AssemblyVersion>
+            <FileVersion>%(PKHeXAssembly.Version)</FileVersion>
+        </PropertyGroup>
+        <Message Text="Building plugin for PKHeX version: $(Version)" Importance="high" />
+    </Target>
+</Project>
