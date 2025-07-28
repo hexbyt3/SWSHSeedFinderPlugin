@@ -1133,7 +1133,8 @@ public partial class Gen8SeedFinderForm : Form
             (AbilityPermission.OnlyFirst, 1) => pk.Ability == pi.Ability1,
             (AbilityPermission.OnlySecond, 2) => pk.Ability == pi.Ability2,
             (AbilityPermission.OnlyHidden, 4) => pk.Ability == pi.AbilityH,
-            (AbilityPermission.Any12, <= 2) => true,
+            (AbilityPermission.Any12, 1) => pk.Ability == pi.Ability1,
+            (AbilityPermission.Any12, 2) => pk.Ability == pi.Ability2,
             (_, _) when criteria == AbilityPermission.Any12H => true,
             _ => false
         };
