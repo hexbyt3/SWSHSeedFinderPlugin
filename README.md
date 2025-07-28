@@ -1,35 +1,40 @@
-# SV Seed Finder Plugin for PKHeX
+# Gen8 Seed Finder Plugin for PKHeX
 
-A seed finding plugin for PKHeX that helps you search for specific Generation 9 Tera Raid encounters in Pokemon Scarlet & Violet.
+A seed finding plugin for PKHeX that helps you search for specific Generation 8 Max Raid encounters in Pokémon Sword & Shield.
 
 ## About
 
 This plugin started as part of my custom [ALM](https://github.com/hexbyt3/ALM4SysBot)(AutoLegalityMod) project and has been extracted into a standalone tool for users who just need seed finding functionality. It searches through raid seeds to find encounters that match your exact criteria - whether you're looking for a specific shiny, perfect IVs, or a particular nature.
 
-The tool supports all raid types including standard Tera Raids, event distributions, and 7-star Unrivaled raids.
+The tool supports all raid types including Normal Raid Dens, Rare (Crystal) Dens, Event Distributions, and Max Lair encounters from the Crown Tundra DLC.
 
 **Author:** [@hexbyt3](https://github.com/hexbyt3)
 
 ## Screenshots
-<img width="955" height="683" alt="image" src="https://github.com/user-attachments/assets/ab139f22-ce0d-48ec-bfb7-6ab7b9e03f5c" />
+<img width="824" height="548" alt="image" src="https://github.com/user-attachments/assets/72d3ffa3-589c-4f86-9efb-bb45a0015e83" />
+<img width="303" height="311" alt="image" src="https://github.com/user-attachments/assets/5ce8082c-101e-4ad3-a0b0-f713fea72896" />
 
-<img width="400" height="412" alt="image" src="https://github.com/user-attachments/assets/2024ccca-a032-4f20-bdce-164f09cd94e7" />
 
 ## Features
 
-- Search through millions of seeds with customizable ranges
-- Support for all Gen 9 raid types (Paldea, Kitakami, Blueberry, Events, and 7-star raids)
-- Real-time validation that prevents impossible search combinations
-- Quick species search with type-ahead filtering
+- Search through millions of seeds with customizable ranges (64-bit seed support)
+- Support for all Gen 8 raid types:
+  - Normal Raid Dens (version-specific encounters)
+  - Rare Crystal Dens
+  - Event Distribution raids
+  - Max Lair encounters (Crown Tundra)
+- Real-time species filtering with type-ahead search
 - Detailed search criteria:
   - IV ranges for all stats
   - Nature selection
-  - Ability preferences
+  - Ability preferences (including Hidden Ability)
   - Gender requirements
   - Shiny status (including square/star specific)
-- Automatic Met Date correction for 7-star Mighty raids
+  - Gigantamax capability filtering
+- Star rating display (flawless IV count)
 - Export results to CSV for spreadsheet analysis
-- Dark theme compatible with highlighted shiny results
+- Dark theme compatible with highlighted shiny results (blue for square, gold for star)
+- Direct loading of results into PKHeX editor
 
 ## Requirements
 
@@ -39,63 +44,79 @@ The tool supports all raid types including standard Tera Raids, event distributi
 
 ## Installation
 
-1. Download the latest `SVSeedFinderPlugin.dll` from the releases page
+1. Download the latest `Gen8SeedFinderPlugin.dll` from the releases page
 2. Place it in PKHeX's `plugins` folder (create the folder if it doesn't exist)
 3. Restart PKHeX
-4. You'll find "SV Seed Finder" in the Tools menu
+4. You'll find "Gen 8 Raid Seed Finder" in the Tools menu
 
 ## Usage
 
 ### Basic Search
-1. Open the plugin from Tools > SV Seed Finder
-2. Select your target Pokemon species
+1. Open the plugin from Tools > Gen 8 Raid Seed Finder
+2. Search or select your target Pokémon species
 3. Choose the form if applicable
-4. Set your search criteria
-5. Click Search
+4. Select which encounter sources to search (Normal Dens, Crystal, Events, Max Lair)
+5. Set your search criteria
+6. Click Search
 
-### Understanding Encounter Constraints
+### Understanding Raid Mechanics
 
-Some encounters have fixed properties that can't be changed. The plugin will highlight incompatible criteria in red and show warnings in the status bar. For example:
-- 7-star raids always have 6 perfect IVs
-- Event raids might have fixed natures or abilities
-- Some raids are shiny-locked
+Different raid types have different characteristics:
+- **Normal Dens**: Star rating determines flawless IV count (1★=1IV, 2★=2IV, etc.)
+- **Crystal Dens**: Always have higher flawless IV counts
+- **Event Distributions**: May have special moves or fixed properties
+- **Max Lair**: Always 4 flawless IVs, special shiny mechanics
 
 ### Search Tips
 
-- Start with broader criteria and narrow down
-- Use specific seed ranges if you're checking a particular set
-- The "Any Encounter" option searches all possible raids for that species
-- Double-click any result to load it directly into PKHeX to quickly export it as a file or load onto your switch via LiveHex.
+- Use the species search box to quickly filter through the Pokémon list
+- The plugin shows which sources have encounters for your selected Pokémon
+- Hex seed ranges are supported (e.g., 0000000000000000 to 00000000FFFFFFFF)
+- Use parallel processing for faster searches - processes ~50,000+ seeds per second
+- Double-click any result to load it directly into PKHeX
 
 ### Performance
 
-The search processes approximately 10,000 seeds per second. Searching the entire seed range (0x00000000 to 0xFFFFFFFF) would take several days, so it's recommended to:
-- Set reasonable result limits
-- Use specific seed ranges when possible
-- Stop searches once you find suitable results
+The search uses parallel processing to maximize speed. On modern CPUs:
+- Processes approximately 50,000-100,000 seeds per second
+- Searching large ranges is feasible but may take time
+- Use the Stop button to cancel long searches
+- Results are added in real-time as they're found
 
 ## Building from Source
 
 If you want to build the plugin yourself:
 
 1. Clone this repository
-2. Open `SVSeedFinderPlugin.sln` in Visual Studio 2022 or later
+2. Open `Gen8SeedFinderPlugin.sln` in Visual Studio 2022 or later
+3. Ensure you have the PKHeX.Core NuGet package referenced
 4. Build in Release mode
 5. The compiled DLL will be in `bin/Release/net9.0-windows/`
 
 ## Technical Details
 
-This plugin uses PKHeX.Core's raid generation system to ensure all found seeds produce legal Pokemon. The search algorithm:
-- Validates each seed against the selected encounter's constraints
-- Generates the full Pokemon data to check all properties
-- Ensures proper correlation between seed and Pokemon data
+This plugin uses PKHeX.Core's Generation 8 raid generation system with:
+- **Xoroshiro128+** RNG for raid generation
+- Proper seed correlation validation
+- Support for all Gen 8 encounter types (EncounterStatic8N, 8NC, 8ND, 8U)
+- Full compatibility with overworld correlation requirements
+- Accurate star rating and flawless IV generation
+
+The search algorithm:
+- Validates seeds against specific encounter constraints
+- Generates full Pokémon data to verify all properties
+- Ensures proper 64-bit seed correlation
+- Handles version-exclusive encounters correctly
 
 ## Credits
 
 This plugin wouldn't exist without the incredible work of the PKHeX team:
 - **Kurt (@kwsch)** - For creating and maintaining PKHeX, and for the comprehensive encounter database that makes this possible
-- **Manu (@manu098vm)** - For the raid seed research and RNG implementation that powers the search functionality
+- **SciresM** - For the initial Gen 8 raid RNG research
+- **Leanny** - For raid den location data and encounter tables
 - All PKHeX contributors who have helped build the foundation this relies on
+
+Special thanks to the RNG research community for documenting the Xoroshiro128+ algorithm used in Generation 8 raids.
 
 ## License
 
