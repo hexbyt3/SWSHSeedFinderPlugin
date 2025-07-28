@@ -12,7 +12,7 @@ namespace SWSHSeedFinderPlugin;
 /// </summary>
 public sealed class SWSHSeedFinderPlugin : IPlugin
 {
-    public string Name => "Gen 8 Seed Finder";
+    public string Name => "SWSH Seed Finder";
     public int Priority => 1;
 
     // Initialized on plugin load

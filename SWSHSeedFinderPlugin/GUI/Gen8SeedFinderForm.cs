@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -26,6 +27,15 @@ public partial class Gen8SeedFinderForm : Form
     private List<ComboItem> _allSpecies = [];
     private readonly Lock _resultsLock = new();
 
+    // Preview panel components
+    private Panel _previewPanel = null!;
+    private PictureBox _previewSprite = null!;
+    private Label _previewTitle = null!;
+    private Label _previewDetails = null!;
+    private Label _previewStats = null!;
+    private Label _previewMoves = null!;
+    private static readonly HttpClient _httpClient = new();
+
     /// <summary>
     /// Flags for different encounter sources in Generation 8.
     /// </summary>
@@ -49,9 +59,348 @@ public partial class Gen8SeedFinderForm : Form
         _saveFileEditor = saveFileEditor;
         _pkmEditor = pkmEditor;
         InitializeComponent();
+        InitializePreviewPanel();
         LoadSpeciesList();
         LoadTrainerData();
         SetupEventHandlers();
+    }
+
+    /// <summary>
+    /// Initializes the preview panel components.
+    /// </summary>
+    private void InitializePreviewPanel()
+    {
+        _previewPanel = new Panel
+        {
+            Dock = DockStyle.Bottom,
+            Height = 200,
+            BorderStyle = BorderStyle.FixedSingle,
+            BackColor = SystemColors.Control,
+            Visible = false
+        };
+
+        _previewSprite = new PictureBox
+        {
+            Location = new Point(10, 10),
+            Size = new Size(68, 56),
+            SizeMode = PictureBoxSizeMode.Zoom,
+            BackColor = Color.Transparent,
+            BorderStyle = BorderStyle.FixedSingle
+        };
+
+        _previewTitle = new Label
+        {
+            Location = new Point(85, 10),
+            Size = new Size(250, 20),
+            Font = new Font(Font.FontFamily, 10, FontStyle.Bold)
+        };
+
+        _previewDetails = new Label
+        {
+            Location = new Point(85, 35),
+            Size = new Size(250, 60),
+            AutoSize = false
+        };
+
+        _previewStats = new Label
+        {
+            Location = new Point(340, 10),
+            Size = new Size(180, 180),
+            AutoSize = false,
+            Font = new Font("Consolas", 9)
+        };
+
+        _previewMoves = new Label
+        {
+            Location = new Point(85, 100),
+            Size = new Size(250, 90),
+            AutoSize = false
+        };
+
+        _previewPanel.Controls.AddRange(new Control[] {
+            _previewSprite, _previewTitle, _previewDetails, _previewStats, _previewMoves
+        });
+
+        // Add preview panel to results panel
+        resultsPanel?.Controls.Add(_previewPanel);
+
+        // Adjust grid size when preview is shown
+        if (resultsGrid != null)
+        {
+            resultsGrid.SelectionChanged += ResultsGrid_SelectionChanged;
+        }
+    }
+
+    /// <summary>
+    /// Handles selection change events in the results grid to update preview.
+    /// </summary>
+    private void ResultsGrid_SelectionChanged(object? sender, EventArgs e)
+    {
+        if (resultsGrid.SelectedRows.Count == 0 || _previewPanel == null)
+        {
+            if (_previewPanel != null)
+                _previewPanel.Visible = false;
+            return;
+        }
+
+        var result = resultsGrid.SelectedRows[0].Tag as SeedResult;
+        if (result != null)
+        {
+            UpdatePreviewPanel(result);
+
+            // Adjust grid height to accommodate preview
+            if (!_previewPanel.Visible)
+            {
+                _previewPanel.Visible = true;
+                resultsGrid.Height = resultsPanel.Height - _previewPanel.Height;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Updates the preview panel with the selected result's information.
+    /// </summary>
+    /// <param name="result">Selected seed result</param>
+    private void UpdatePreviewPanel(SeedResult result)
+    {
+        if (_previewSprite == null || _previewTitle == null || _previewDetails == null ||
+            _previewStats == null || _previewMoves == null)
+        {
+            return;
+        }
+
+        var pk = result.Pokemon;
+        var wrapper = new EncounterWrapper(result.Encounter, GameVersion.SWSH);
+
+        // Load sprite asynchronously
+        _ = LoadPokemonSpriteAsync(pk);
+
+        // Set title
+        var speciesName = GameInfo.Strings.specieslist[pk.Species];
+        var formName = pk.Form > 0 ? $" ({FormConverter.GetFormList(pk.Species, GameInfo.Strings.types, GameInfo.Strings.forms, GameInfo.GenderSymbolASCII, EntityContext.Gen8)[pk.Form]})" : "";
+        var shinyIndicator = pk.IsShiny ? (pk.ShinyXor == 0 ? " ■" : " ★") : "";
+        _previewTitle.Text = $"{speciesName}{formName}{shinyIndicator}";
+        _previewTitle.ForeColor = pk.IsShiny ? (pk.ShinyXor == 0 ? Color.DeepSkyBlue : Color.Gold) : SystemColors.ControlText;
+
+        // Set details
+        var details = new List<string>
+        {
+            $"Seed: {result.Seed:X16}",
+            $"Nature: {pk.Nature} | Gender: {GetGenderSymbol(pk.Gender)}",
+            $"Ability: {GetAbilityName(pk)} ({GetAbilityType(pk)})",
+            pk.CanGigantamax ? "Can Gigantamax" : ""
+        };
+
+        details.Add($"Encounter: {wrapper.GetDescription()}");
+
+        _previewDetails.Text = string.Join("\n", details.Where(s => !string.IsNullOrEmpty(s)));
+
+        // Set stats
+        var stats = new[]
+        {
+            "Stats:",
+            $"HP:  {pk.IV_HP,2} IV | {pk.Stat_HPMax,3} Total",
+            $"Atk: {pk.IV_ATK,2} IV | {pk.Stat_ATK,3} Total",
+            $"Def: {pk.IV_DEF,2} IV | {pk.Stat_DEF,3} Total",
+            $"SpA: {pk.IV_SPA,2} IV | {pk.Stat_SPA,3} Total",
+            $"SpD: {pk.IV_SPD,2} IV | {pk.Stat_SPD,3} Total",
+            $"Spe: {pk.IV_SPE,2} IV | {pk.Stat_SPE,3} Total",
+            "",
+            $"Height: {pk.HeightScalar} | Weight: {pk.WeightScalar}"
+        };
+        _previewStats.Text = string.Join("\n", stats);
+
+        // Set moves
+        var moveNames = new List<string>();
+        for (int i = 0; i < 4; i++)
+        {
+            var move = pk.GetMove(i);
+            if (move != 0)
+            {
+                var moveName = GameInfo.Strings.movelist[move];
+                moveNames.Add($"• {moveName}");
+            }
+        }
+        _previewMoves.Text = moveNames.Count > 0 ? "Moves:\n" + string.Join("\n", moveNames) : "";
+    }
+
+    /// <summary>
+    /// Gets the gender symbol for display.
+    /// </summary>
+    /// <param name="gender">Gender value</param>
+    /// <returns>Gender symbol string</returns>
+    private static string GetGenderSymbol(int gender) => gender switch
+    {
+        0 => "♂",
+        1 => "♀",
+        _ => "-"
+    };
+
+    /// <summary>
+    /// Gets the ability type description.
+    /// </summary>
+    /// <param name="pk">Pokémon to check</param>
+    /// <returns>Ability type string</returns>
+    private static string GetAbilityType(PK8 pk) => pk.AbilityNumber switch
+    {
+        1 => "Ability 1",
+        2 => "Ability 2",
+        4 => "Hidden",
+        _ => "?"
+    };
+
+    /// <summary>
+    /// Loads the Pokémon sprite asynchronously from the web.
+    /// </summary>
+    /// <param name="pk">Pokémon to load sprite for</param>
+    private async Task LoadPokemonSpriteAsync(PK8 pk)
+    {
+        try
+        {
+            var url = GetPokemonImageUrl(pk);
+
+            // System.Diagnostics.Debug.WriteLine($"Loading sprite: {GameInfo.Strings.specieslist[pk.Species]} (G-Max: {pk.CanGigantamax}) from {url}");
+
+            using var response = await _httpClient.GetAsync(url);
+            if (response.IsSuccessStatusCode)
+            {
+                using var stream = await response.Content.ReadAsStreamAsync();
+                var image = Image.FromStream(stream);
+
+                // Update UI on main thread
+                if (_previewSprite.InvokeRequired)
+                {
+                    _previewSprite.Invoke(() => _previewSprite.Image = image);
+                }
+                else
+                {
+                    _previewSprite.Image = image;
+                }
+            }
+            else
+            {
+                // System.Diagnostics.Debug.WriteLine($"Failed to load sprite: HTTP {response.StatusCode} for {url}");
+                SetEmptySprite();
+            }
+        }
+        catch (Exception)
+        {
+            // System.Diagnostics.Debug.WriteLine($"Error loading sprite: {ex.Message}");
+            SetEmptySprite();
+        }
+    }
+
+    /// <summary>
+    /// Sets an empty sprite in the preview panel.
+    /// </summary>
+    private void SetEmptySprite()
+    {
+        if (_previewSprite.InvokeRequired)
+        {
+            _previewSprite.Invoke(() => _previewSprite.Image = null);
+        }
+        else
+        {
+            _previewSprite.Image = null;
+        }
+    }
+
+    /// <summary>
+    /// Gets the Pokémon image URL for HOME sprites.
+    /// </summary>
+    /// <param name="pk">Pokémon to get image for</param>
+    /// <returns>Image URL string</returns>
+    private static string GetPokemonImageUrl(PK8 pk)
+    {
+        var baseLink = "https://raw.githubusercontent.com/hexbyt3/HomeImages/master/128x128/poke_capture_0001_000_mf_n_00000000_f_n.png".Split('_');
+
+        // Check if can Gigantamax
+        var canGmax = pk.CanGigantamax;
+
+        // Determine if we need gender-specific sprites
+        bool md = false;
+        bool fd = false;
+
+        // Check for gender-dependent species (but NOT if G-Max)
+        var genderDependentSpecies = new[]
+        {
+            (int)Species.Venusaur, (int)Species.Butterfree, (int)Species.Rattata, (int)Species.Raticate,
+            (int)Species.Pikachu, (int)Species.Zubat, (int)Species.Golbat, (int)Species.Gloom,
+            (int)Species.Vileplume, (int)Species.Kadabra, (int)Species.Alakazam, (int)Species.Doduo,
+            (int)Species.Dodrio, (int)Species.Hypno, (int)Species.Goldeen, (int)Species.Seaking,
+            (int)Species.Scyther, (int)Species.Magikarp, (int)Species.Gyarados, (int)Species.Eevee,
+            (int)Species.Meganium, (int)Species.Ledyba, (int)Species.Ledian, (int)Species.Xatu,
+            (int)Species.Sudowoodo, (int)Species.Politoed, (int)Species.Aipom, (int)Species.Wooper,
+            (int)Species.Quagsire, (int)Species.Murkrow, (int)Species.Wobbuffet, (int)Species.Girafarig,
+            (int)Species.Gligar, (int)Species.Steelix, (int)Species.Scizor, (int)Species.Heracross,
+            (int)Species.Sneasel, (int)Species.Ursaring, (int)Species.Piloswine, (int)Species.Octillery,
+            (int)Species.Houndoom, (int)Species.Donphan, (int)Species.Torchic, (int)Species.Combusken,
+            (int)Species.Blaziken, (int)Species.Beautifly, (int)Species.Dustox, (int)Species.Ludicolo,
+            (int)Species.Nuzleaf, (int)Species.Shiftry, (int)Species.Swalot, (int)Species.Camerupt,
+            (int)Species.Cacturne, (int)Species.Milotic, (int)Species.Relicanth, (int)Species.Starly,
+            (int)Species.Staravia, (int)Species.Staraptor, (int)Species.Bidoof, (int)Species.Bibarel,
+            (int)Species.Kricketot, (int)Species.Kricketune, (int)Species.Shinx, (int)Species.Luxio,
+            (int)Species.Luxray, (int)Species.Roserade, (int)Species.Combee, (int)Species.Pachirisu,
+            (int)Species.Buizel, (int)Species.Floatzel, (int)Species.Ambipom, (int)Species.Gible,
+            (int)Species.Gabite, (int)Species.Garchomp, (int)Species.Hippopotas, (int)Species.Hippowdon,
+            (int)Species.Croagunk, (int)Species.Toxicroak, (int)Species.Finneon, (int)Species.Lumineon,
+            (int)Species.Snover, (int)Species.Abomasnow, (int)Species.Weavile, (int)Species.Rhyperior,
+            (int)Species.Tangrowth, (int)Species.Mamoswine, (int)Species.Unfezant, (int)Species.Frillish,
+            (int)Species.Jellicent, (int)Species.Pyroar, (int)Species.Meowstic, (int)Species.Indeedee
+        };
+
+        if (genderDependentSpecies.Contains(pk.Species) && !canGmax && pk.Form == 0)
+        {
+            if (pk.Gender == 0 && pk.Species != (int)Species.Torchic)
+                md = true;
+            else
+                fd = true;
+        }
+
+        // Special case for Sneasel
+        if (pk.Species == (int)Species.Sneasel)
+        {
+            if (pk.Gender == 0)
+                md = true;
+            else
+                fd = true;
+        }
+
+        // Species number formatting
+        baseLink[2] = pk.Species < 10 ? $"000{pk.Species}" :
+                      pk.Species < 100 ? $"00{pk.Species}" :
+                      pk.Species < 1000 ? $"0{pk.Species}" :
+                      $"{pk.Species}";
+
+        // Form number formatting with special cases
+        int form = pk.Species switch
+        {
+            (int)Species.Sinistea or (int)Species.Polteageist or (int)Species.Rockruff or (int)Species.Mothim => 0,
+            (int)Species.Alcremie when pk.IsShiny || canGmax => 0,
+            _ => pk.Form,
+        };
+        baseLink[3] = form < 10 ? $"00{form}" : $"0{form}";
+
+        // Gender designation
+        baseLink[4] = pk.PersonalInfo.OnlyFemale ? "fo" :
+                      pk.PersonalInfo.OnlyMale ? "mo" :
+                      pk.PersonalInfo.Genderless ? "uk" :
+                      fd ? "fd" :
+                      md ? "md" :
+                      "mf";
+
+        // Gigantamax
+        baseLink[5] = canGmax ? "g" : "n";
+
+        // Form argument (for Alcremie, etc.)
+        baseLink[6] = pk.Species == (int)Species.Alcremie && !canGmax ?
+                      $"0000000{pk.FormArgument}" :
+                      "00000000";
+
+        // Shiny status
+        baseLink[8] = pk.IsShiny ? "r.png" : "n.png";
+
+        return string.Join("_", baseLink);
     }
 
     /// <summary>
@@ -367,6 +716,13 @@ public partial class Gen8SeedFinderForm : Form
             _results.Clear();
         }
         resultsGrid.Rows.Clear();
+
+        // Hide preview panel when starting new search
+        if (_previewPanel != null && _previewPanel.Visible)
+        {
+            _previewPanel.Visible = false;
+            resultsGrid.Height = resultsPanel.Height;
+        }
 
         searchButton.Text = "Stop";
         progressBar.Visible = true;
@@ -710,6 +1066,9 @@ public partial class Gen8SeedFinderForm : Form
                 return null;
             }
 
+            // Ensure stats are calculated
+            pk8.ResetPartyStats();
+
             return pk8;
         }
         catch
@@ -958,6 +1317,19 @@ public partial class Gen8SeedFinderForm : Form
             UpdateSourceDisplay();
             UpdateEncounterCombo();
         }
+    }
+
+    /// <summary>
+    /// Releases managed and unmanaged resources.
+    /// </summary>
+    /// <param name="disposing">True if disposing managed resources</param>
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _httpClient?.Dispose();
+        }
+        base.Dispose(disposing);
     }
 
     /// <summary>
