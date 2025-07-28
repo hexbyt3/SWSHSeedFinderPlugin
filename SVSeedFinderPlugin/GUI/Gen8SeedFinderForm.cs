@@ -19,7 +19,7 @@ namespace SVSeedFinderPlugin.GUI;
 /// <summary>
 /// Form for searching Generation 9 Tera Raid seeds that match specific criteria
 /// </summary>
-public sealed partial class Gen9SeedFinderForm : Form
+public sealed partial class Gen8SeedFinderForm : Form
 {
     private readonly ISaveFileProvider _saveFileEditor;
     private readonly IPKMView _pkmEditor;
@@ -45,7 +45,7 @@ public sealed partial class Gen9SeedFinderForm : Form
     /// </summary>
     /// <param name="saveFileEditor">Save file provider for trainer info</param>
     /// <param name="pkmEditor">PKM editor for loading results</param>
-    public Gen9SeedFinderForm(ISaveFileProvider saveFileEditor, IPKMView pkmEditor)
+    public Gen8SeedFinderForm(ISaveFileProvider saveFileEditor, IPKMView pkmEditor)
     {
         _saveFileEditor = saveFileEditor;
         _pkmEditor = pkmEditor;

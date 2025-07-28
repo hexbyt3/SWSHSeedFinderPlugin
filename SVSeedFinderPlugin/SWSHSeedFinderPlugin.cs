@@ -10,7 +10,7 @@ namespace SVSeedFinderPlugin;
 /// <summary>
 /// PKHeX Plugin for finding Generation 9 Tera Raid seeds that match specific criteria
 /// </summary>
-public sealed class SVSeedFinderPlugin : IPlugin
+public sealed class SWSHSeedFinderPlugin : IPlugin
 {
     public string Name => "SV Seed Finder";
     public int Priority => 1;
@@ -88,7 +88,7 @@ public sealed class SVSeedFinderPlugin : IPlugin
     {
         try
         {
-            using var form = new GUI.Gen9SeedFinderForm(SaveFileEditor, PKMEditor);
+            using var form = new GUI.Gen8SeedFinderForm(SaveFileEditor, PKMEditor);
             form.ShowDialog();
         }
         catch (Exception ex)

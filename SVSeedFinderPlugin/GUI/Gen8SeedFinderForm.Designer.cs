@@ -5,7 +5,7 @@ namespace SVSeedFinderPlugin.GUI
     /// <summary>
     /// Designer file for the Gen9SeedFinderForm
     /// </summary>
-    partial class Gen9SeedFinderForm
+    partial class Gen8SeedFinderForm
     {
         private System.ComponentModel.IContainer components = null;
 
