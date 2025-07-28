@@ -143,8 +143,7 @@ public partial class Gen8SeedFinderForm : Form
             return;
         }
 
-        var result = resultsGrid.SelectedRows[0].Tag as SeedResult;
-        if (result != null)
+        if (resultsGrid.SelectedRows[0].Tag is SeedResult result)
         {
             UpdatePreviewPanel(result);
 
@@ -1318,19 +1317,6 @@ public partial class Gen8SeedFinderForm : Form
             UpdateSourceDisplay();
             UpdateEncounterCombo();
         }
-    }
-
-    /// <summary>
-    /// Releases managed and unmanaged resources.
-    /// </summary>
-    /// <param name="disposing">True if disposing managed resources</param>
-    protected override void Dispose(bool disposing)
-    {
-        if (disposing)
-        {
-            _httpClient?.Dispose();
-        }
-        base.Dispose(disposing);
     }
 
     /// <summary>
