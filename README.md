@@ -11,9 +11,9 @@ The tool supports all raid types including Normal Raid Dens, Rare (Crystal) Dens
 **Author:** [@hexbyt3](https://github.com/hexbyt3)
 
 ## Screenshots
-<img width="824" height="548" alt="image" src="https://github.com/user-attachments/assets/72d3ffa3-589c-4f86-9efb-bb45a0015e83" />
-<img width="303" height="311" alt="image" src="https://github.com/user-attachments/assets/5ce8082c-101e-4ad3-a0b0-f713fea72896" />
+<img width="823" height="549" alt="image" src="https://github.com/user-attachments/assets/a17a0de1-d206-4470-96e8-9780aab46f2d" />
 
+<img width="307" height="308" alt="image" src="https://github.com/user-attachments/assets/f4214879-9762-4454-8f87-6f253442aec7" />
 
 ## Features
 
