@@ -986,10 +986,10 @@ public partial class Gen8SeedFinderForm : Form
 
         var param = encounter switch
         {
-            EncounterStatic8N n => new GenerateParam8(n.Species, GetGenderRatio(n), flawlessIVs, n.Ability, n.Shiny, Nature.Random, n.IVs),
-            EncounterStatic8NC nc => new GenerateParam8(nc.Species, GetGenderRatio(nc), flawlessIVs, nc.Ability, nc.Shiny, Nature.Random, nc.IVs),
-            EncounterStatic8ND nd => new GenerateParam8(nd.Species, GetGenderRatio(nd), flawlessIVs, nd.Ability, nd.Shiny, Nature.Random, nd.IVs),
-            EncounterStatic8U u => new GenerateParam8(u.Species, GetGenderRatio(u), flawlessIVs, u.Ability, Shiny.Never, Nature.Random, u.IVs),
+            EncounterStatic8N n => new GenerateParam8(n.Species, GetGenderRatio(n), (byte)flawlessIVs, n.Ability, n.Shiny, Nature.Random, n.IVs),
+            EncounterStatic8NC nc => new GenerateParam8(nc.Species, GetGenderRatio(nc), (byte)flawlessIVs, nc.Ability, nc.Shiny, Nature.Random, nc.IVs),
+            EncounterStatic8ND nd => new GenerateParam8(nd.Species, GetGenderRatio(nd), (byte)flawlessIVs, nd.Ability, nd.Shiny, Nature.Random, nd.IVs),
+            EncounterStatic8U u => new GenerateParam8(u.Species, GetGenderRatio(u), (byte)flawlessIVs, u.Ability, Shiny.Never, Nature.Random, u.IVs),
             _ => default
         };
 
