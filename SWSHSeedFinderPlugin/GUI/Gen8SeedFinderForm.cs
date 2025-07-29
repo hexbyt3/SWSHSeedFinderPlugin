@@ -898,11 +898,17 @@ public partial class Gen8SeedFinderForm : Form
                 {
                     foreach (var wrapper in encountersToCheck)
                     {
+                        // First, quickly verify if seed is valid without full generation
+                        if (!QuickVerifySeed(wrapper.Encounter, currentSeed, criteria, ivRanges, tr))
+                            continue;
+
+                        // Only generate full Pokemon for valid seeds
                         var pk = TryGenerateRaidPokemon(wrapper.Encounter, currentSeed, criteria, tr, form);
                         if (pk == null)
                             continue;
 
-                        if (!CheckPokemonMatchesCriteria(pk, criteria, ivRanges))
+                        // Double-check IVs match what we validated (in case of RNG differences)
+                        if (!CheckIVRanges(pk, ivRanges))
                             continue;
 
                         var result = new SeedResult
@@ -956,6 +962,200 @@ public partial class Gen8SeedFinderForm : Form
             statusLabel.Text = $"Found {results.Count} matches after checking {seedsChecked:N0} seeds";
             progressBar.Value = 100;
         });
+    }
+
+    /// <summary>
+    /// Quickly verifies if a seed matches the search criteria without generating a full Pokémon.
+    /// </summary>
+    /// <param name="encounter">Encounter to verify against</param>
+    /// <param name="seed">Seed value to check</param>
+    /// <param name="criteria">Search criteria</param>
+    /// <param name="ivRanges">IV ranges to validate</param>
+    /// <param name="tr">Trainer information</param>
+    /// <returns>True if the seed potentially matches criteria, false otherwise</returns>
+    private bool QuickVerifySeed(object encounter, ulong seed, EncounterCriteria criteria, IVRange[] ivRanges, ITrainerInfo tr)
+    {
+        var flawlessIVs = encounter switch
+        {
+            EncounterStatic8N n => n.FlawlessIVCount,
+            EncounterStatic8NC nc => nc.FlawlessIVCount,
+            EncounterStatic8ND nd => nd.FlawlessIVCount,
+            EncounterStatic8U u => u.FlawlessIVCount,
+            _ => 0
+        };
+
+        var param = encounter switch
+        {
+            EncounterStatic8N n => new GenerateParam8(n.Species, GetGenderRatio(n), flawlessIVs, n.Ability, n.Shiny, Nature.Random, n.IVs),
+            EncounterStatic8NC nc => new GenerateParam8(nc.Species, GetGenderRatio(nc), flawlessIVs, nc.Ability, nc.Shiny, Nature.Random, nc.IVs),
+            EncounterStatic8ND nd => new GenerateParam8(nd.Species, GetGenderRatio(nd), flawlessIVs, nd.Ability, nd.Shiny, Nature.Random, nd.IVs),
+            EncounterStatic8U u => new GenerateParam8(u.Species, GetGenderRatio(u), flawlessIVs, u.Ability, Shiny.Never, Nature.Random, u.IVs),
+            _ => default
+        };
+
+        if (param.Species == 0)
+            return false;
+
+        // Quick verification using RNG calculation without full Pokemon generation
+        var rng = new Xoroshiro128Plus(seed);
+        var ec = (uint)rng.NextInt();
+
+        uint pid;
+        bool isShiny;
+        {
+            var trID = (uint)rng.NextInt();
+            pid = (uint)rng.NextInt();
+            var xor = PKHeX.Core.ShinyUtil.GetShinyXor(pid, trID);
+            isShiny = xor < 16;
+        }
+
+        // Check shiny criteria first (fastest check)
+        bool matchesShiny = criteria.Shiny switch
+        {
+            Shiny.Never => !isShiny,
+            Shiny.Always => isShiny,
+            Shiny.AlwaysSquare => isShiny && (pid ^ tr.ID32) >> 16 == 0,
+            Shiny.AlwaysStar => isShiny && (pid ^ tr.ID32) >> 16 > 0 && (pid ^ tr.ID32) >> 16 < 16,
+            _ => true
+        };
+
+        if (!matchesShiny)
+            return false;
+
+        // Quick IV check
+        Span<int> ivs = stackalloc int[6];
+        ivs.Fill(-1);
+
+        for (int i = 0; i < flawlessIVs; i++)
+        {
+            int index = (int)rng.NextInt(6);
+            while (ivs[index] != -1)
+                index = (int)rng.NextInt(6);
+            ivs[index] = 31;
+        }
+
+        for (int i = 0; i < 6; i++)
+        {
+            if (ivs[i] == -1)
+                ivs[i] = (int)rng.NextInt(32);
+        }
+
+        // Check IV ranges
+        if (!CheckIVRangesSpan(ivs, ivRanges))
+            return false;
+
+        // Check ability if specified
+        if (criteria.Ability != AbilityPermission.Any12H)
+        {
+            int ability = param.Ability switch
+            {
+                AbilityPermission.Any12H => (int)rng.NextInt(3),
+                AbilityPermission.Any12 => (int)rng.NextInt(2),
+                _ => param.Ability.GetSingleValue(),
+            };
+
+            if (!CheckAbilityQuick(ability, criteria.Ability))
+                return false;
+        }
+
+        // Check gender if specified
+        if (criteria.Gender != Gender.Random)
+        {
+            byte gender = param.GenderRatio switch
+            {
+                PersonalInfo.RatioMagicGenderless => 2,
+                PersonalInfo.RatioMagicFemale => 1,
+                PersonalInfo.RatioMagicMale => 0,
+                _ => rng.NextInt(253) + 1 < param.GenderRatio ? (byte)1 : (byte)0,
+            };
+
+            if (gender != (byte)criteria.Gender)
+                return false;
+        }
+
+        // Check nature if specified
+        if (criteria.Nature != Nature.Random)
+        {
+            var nature = param.Nature != Nature.Random ? param.Nature : (Nature)rng.NextInt(25);
+            if (nature != criteria.Nature)
+                return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Checks if the given IVs are within the specified ranges using a Span for performance.
+    /// </summary>
+    /// <param name="ivs">Span containing the 6 IV values</param>
+    /// <param name="ranges">Array of IV ranges to validate against</param>
+    /// <returns>True if all IVs are within their respective ranges, false otherwise</returns>
+    private static bool CheckIVRangesSpan(Span<int> ivs, IVRange[] ranges)
+    {
+        return ivs[0] >= ranges[0].Min && ivs[0] <= ranges[0].Max &&
+               ivs[1] >= ranges[1].Min && ivs[1] <= ranges[1].Max &&
+               ivs[2] >= ranges[2].Min && ivs[2] <= ranges[2].Max &&
+               ivs[3] >= ranges[3].Min && ivs[3] <= ranges[3].Max &&
+               ivs[4] >= ranges[4].Min && ivs[4] <= ranges[4].Max &&
+               ivs[5] >= ranges[5].Min && ivs[5] <= ranges[5].Max;
+    }
+
+    /// <summary>
+    /// Quickly checks if an ability number matches the specified criteria.
+    /// </summary>
+    /// <param name="abilityNumber">The ability slot number (0-2)</param>
+    /// <param name="criteria">The ability permission criteria</param>
+    /// <returns>True if the ability matches criteria, false otherwise</returns>
+    private static bool CheckAbilityQuick(int abilityNumber, AbilityPermission criteria)
+    {
+        return (criteria, abilityNumber) switch
+        {
+            (AbilityPermission.OnlyFirst, 0) => true,
+            (AbilityPermission.OnlySecond, 1) => true,
+            (AbilityPermission.OnlyHidden, 2) => true,
+            (AbilityPermission.Any12, 0 or 1) => true,
+            _ => false
+        };
+    }
+
+    /// <summary>
+    /// Gets the gender ratio for an encounter, handling fixed gender encounters.
+    /// </summary>
+    /// <typeparam name="T">Encounter type that implements IFixedGender</typeparam>
+    /// <param name="encounter">The encounter to get gender ratio for</param>
+    /// <returns>Gender ratio byte value</returns>
+    private static byte GetGenderRatio<T>(T encounter) where T : IFixedGender
+    {
+        if (encounter.Gender != FixedGenderUtil.GenderRandom)
+        {
+            return encounter.Gender switch
+            {
+                0 => PersonalInfo.RatioMagicMale,
+                1 => PersonalInfo.RatioMagicFemale,
+                2 => PersonalInfo.RatioMagicGenderless,
+                _ => 127
+            };
+        }
+
+        var species = encounter switch
+        {
+            EncounterStatic8N n => n.Species,
+            EncounterStatic8NC nc => nc.Species,
+            EncounterStatic8ND nd => nd.Species,
+            EncounterStatic8U u => u.Species,
+            _ => (ushort)0
+        };
+
+        var form = encounter switch
+        {
+            EncounterStatic8N n => n.Form,
+            EncounterStatic8NC nc => nc.Form,
+            EncounterStatic8ND nd => nd.Form,
+            EncounterStatic8U u => u.Form,
+            _ => (byte)0
+        };
+
+        return PersonalTable.SWSH[species, form].Gender;
     }
 
     /// <summary>
