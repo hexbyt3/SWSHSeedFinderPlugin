@@ -1,3 +1,7 @@
+![GitHub Release](https://img.shields.io/github/v/release/hexbyt3/Swshseedfinderplugin)
+![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/hexbyt3/Swshseedfinderplugin/total?color=violet)
+
+
 # Gen8 Seed Finder Plugin for PKHeX
 
 A seed finding plugin for PKHeX that helps you search for specific Generation 8 Max Raid encounters in Pokémon Sword & Shield.
