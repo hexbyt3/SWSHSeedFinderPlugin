@@ -18,6 +18,7 @@ public sealed class SWSHSeedFinderPlugin : IPlugin
     // Initialized on plugin load
     public ISaveFileProvider SaveFileEditor { get; private set; } = null!;
     public IPKMView PKMEditor { get; private set; } = null!;
+    private ToolStripMenuItem? PluginMenuItem { get; set; }
 
     public void Initialize(params object[] args)
     {
@@ -43,14 +44,14 @@ public sealed class SWSHSeedFinderPlugin : IPlugin
 
     private void AddPluginControl(ToolStripDropDownItem tools)
     {
-        var ctrl = new ToolStripMenuItem(Name)
+        PluginMenuItem = new ToolStripMenuItem(Name)
         {
-            ShortcutKeys = Keys.Control | Keys.F,
+            ShortcutKeys = Keys.Control | Keys.Shift | Keys.W,
             Image = CreateRaidCrystalIcon()
         };
 
-        ctrl.Click += (_, _) => ShowSeedFinderForm();
-        tools.DropDownItems.Add(ctrl);
+        PluginMenuItem.Click += (_, _) => ShowSeedFinderForm();
+        tools.DropDownItems.Add(PluginMenuItem);
         Console.WriteLine($"{Name} added menu item.");
     }
 
@@ -114,6 +115,15 @@ public sealed class SWSHSeedFinderPlugin : IPlugin
     public void NotifySaveLoaded()
     {
         Console.WriteLine($"{Name} was notified that a Save File was just loaded.");
+        
+        if (PluginMenuItem != null)
+        {
+            var sav = SaveFileEditor.SAV;
+            // Enable only for Sword/Shield games
+            PluginMenuItem.Enabled = sav.Version == GameVersion.SW || 
+                                    sav.Version == GameVersion.SH || 
+                                    sav.Version == GameVersion.SWSH;
+        }
     }
 
     public bool TryLoadFile(string filePath)
