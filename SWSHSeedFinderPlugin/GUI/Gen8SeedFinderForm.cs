@@ -63,6 +63,18 @@ public partial class Gen8SeedFinderForm : Form
         LoadSpeciesList();
         LoadTrainerData();
         SetupEventHandlers();
+
+        // Cancel search when form is closing
+        FormClosing += OnFormClosing;
+    }
+
+    /// <summary>
+    /// Handles form closing to cancel any running search
+    /// </summary>
+    private void OnFormClosing(object? sender, FormClosingEventArgs e)
+    {
+        // Cancel any running search operation
+        _searchCts?.Cancel();
     }
 
     /// <summary>
@@ -735,12 +747,18 @@ public partial class Gen8SeedFinderForm : Form
         }
         catch (OperationCanceledException)
         {
-            statusLabel.Text = "Search cancelled";
+            if (!IsDisposed && !statusLabel.IsDisposed)
+                statusLabel.Text = "Search cancelled";
         }
         finally
         {
-            searchButton.Text = "Search";
-            progressBar.Visible = false;
+            if (!IsDisposed)
+            {
+                if (!searchButton.IsDisposed)
+                    searchButton.Text = "Search";
+                if (!progressBar.IsDisposed)
+                    progressBar.Visible = false;
+            }
             _searchCts?.Dispose();
             _searchCts = null;
         }
@@ -942,12 +960,22 @@ public partial class Gen8SeedFinderForm : Form
                 if (seedsChecked - lastProgressUpdate >= updateInterval)
                 {
                     lastProgressUpdate = seedsChecked;
-                    this.Invoke(() =>
+                    try
                     {
-                        var progressPercent = (int)((seedsChecked / (double)totalSeeds) * 100);
-                        progressBar.Value = Math.Min(progressPercent, 100);
-                        statusLabel.Text = $"Checked {seedsChecked:N0} ({progressPercent}%), found {results.Count}";
-                    });
+                        this.Invoke(() =>
+                        {
+                            if (!IsDisposed && !progressBar.IsDisposed && !statusLabel.IsDisposed)
+                            {
+                                var progressPercent = (int)((seedsChecked / (double)totalSeeds) * 100);
+                                progressBar.Value = Math.Min(progressPercent, 100);
+                                statusLabel.Text = $"Checked {seedsChecked:N0} ({progressPercent}%), found {results.Count}";
+                            }
+                        });
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        // Form was disposed while updating, ignore
+                    }
                 }
             }
         }
@@ -957,11 +985,21 @@ public partial class Gen8SeedFinderForm : Form
             _results = results;
         }
 
-        this.Invoke(() =>
+        try
         {
-            statusLabel.Text = $"Found {results.Count} matches after checking {seedsChecked:N0} seeds";
-            progressBar.Value = 100;
-        });
+            this.Invoke(() =>
+            {
+                if (!IsDisposed && !statusLabel.IsDisposed && !progressBar.IsDisposed)
+                {
+                    statusLabel.Text = $"Found {results.Count} matches after checking {seedsChecked:N0} seeds";
+                    progressBar.Value = 100;
+                }
+            });
+        }
+        catch (ObjectDisposedException)
+        {
+            // Form was disposed while updating, ignore
+        }
     }
 
     /// <summary>
@@ -1361,35 +1399,45 @@ public partial class Gen8SeedFinderForm : Form
     /// <param name="result">Seed result to add</param>
     private void AddResultToGrid(SeedResult result)
     {
-        this.Invoke(() =>
+        try
         {
-            var wrapper = new EncounterWrapper(result.Encounter, GameVersion.SWSH);
-            var stars = GetStarRating(result.Encounter);
-            var shinyType = result.Pokemon.IsShiny ? (result.Pokemon.ShinyXor == 0 ? "■" : "★") : "";
-
-            var row = resultsGrid.Rows.Add(
-                $"{result.Seed:X16}",
-                wrapper.GetShortDescription(),
-                stars,
-                shinyType,
-                result.Pokemon.Nature.ToString(),
-                GetAbilityName(result.Pokemon),
-                GetIVString(result.Pokemon),
-                result.Pokemon.CanGigantamax ? "G-Max" : "-"
-            );
-
-            // Store the result index in the row tag for easy retrieval
-            resultsGrid.Rows[row].Tag = result;
-
-            if (result.Pokemon.IsShiny)
+            this.Invoke(() =>
             {
-                var isSquare = result.Pokemon.ShinyXor == 0;
-                resultsGrid.Rows[row].DefaultCellStyle.BackColor = isSquare ? Color.FromArgb(32, 32, 64) : Color.FromArgb(64, 64, 32);
-                resultsGrid.Rows[row].DefaultCellStyle.ForeColor = isSquare ? Color.DeepSkyBlue : Color.Gold;
-                resultsGrid.Rows[row].DefaultCellStyle.SelectionBackColor = isSquare ? Color.DarkBlue : Color.DarkGoldenrod;
-                resultsGrid.Rows[row].DefaultCellStyle.SelectionForeColor = Color.White;
-            }
-        });
+                if (!IsDisposed && !resultsGrid.IsDisposed)
+                {
+                    var wrapper = new EncounterWrapper(result.Encounter, GameVersion.SWSH);
+                    var stars = GetStarRating(result.Encounter);
+                    var shinyType = result.Pokemon.IsShiny ? (result.Pokemon.ShinyXor == 0 ? "■" : "★") : "";
+
+                    var row = resultsGrid.Rows.Add(
+                        $"{result.Seed:X16}",
+                        wrapper.GetShortDescription(),
+                        stars,
+                        shinyType,
+                        result.Pokemon.Nature.ToString(),
+                        GetAbilityName(result.Pokemon),
+                        GetIVString(result.Pokemon),
+                        result.Pokemon.CanGigantamax ? "G-Max" : "-"
+                    );
+
+                    // Store the result index in the row tag for easy retrieval
+                    resultsGrid.Rows[row].Tag = result;
+
+                    if (result.Pokemon.IsShiny)
+                    {
+                        var isSquare = result.Pokemon.ShinyXor == 0;
+                        resultsGrid.Rows[row].DefaultCellStyle.BackColor = isSquare ? Color.FromArgb(32, 32, 64) : Color.FromArgb(64, 64, 32);
+                        resultsGrid.Rows[row].DefaultCellStyle.ForeColor = isSquare ? Color.DeepSkyBlue : Color.Gold;
+                        resultsGrid.Rows[row].DefaultCellStyle.SelectionBackColor = isSquare ? Color.DarkBlue : Color.DarkGoldenrod;
+                        resultsGrid.Rows[row].DefaultCellStyle.SelectionForeColor = Color.White;
+                    }
+                }
+            });
+        }
+        catch (ObjectDisposedException)
+        {
+            // Form was disposed while updating, ignore
+        }
     }
 
     /// <summary>
