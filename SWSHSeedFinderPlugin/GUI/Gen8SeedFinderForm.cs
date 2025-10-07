@@ -431,8 +431,11 @@ public partial class Gen8SeedFinderForm : Form
     private void LoadTrainerData()
     {
         var sav = _saveFileEditor.SAV;
-        tidNum.Value = sav.TID16;
-        sidNum.Value = sav.SID16;
+        // Gen 8 uses the Gen 7+ display format (6-digit TID, 4-digit SID)
+        // Convert from internal 16-bit values to display format
+        uint id32 = ((uint)sav.SID16 << 16) | sav.TID16;
+        tidNum.Value = id32 % 1000000; // TID7 (0-999999)
+        sidNum.Value = id32 / 1000000; // SID7 (0-4294)
     }
 
     /// <summary>
@@ -857,10 +860,15 @@ public partial class Gen8SeedFinderForm : Form
         if (version is not (GameVersion.SW or GameVersion.SH))
             version = GameVersion.SW;
 
+        // Convert from display format (TID7/SID7) to ID32, then extract 16-bit values
+        uint id32 = ((uint)sidNum.Value * 1000000) + (uint)tidNum.Value;
+        ushort tid16 = (ushort)(id32 & 0xFFFF);
+        ushort sid16 = (ushort)(id32 >> 16);
+
         return new SimpleTrainerInfo(version)
         {
-            TID16 = (ushort)tidNum.Value,
-            SID16 = (ushort)sidNum.Value,
+            TID16 = tid16,
+            SID16 = sid16,
             OT = _saveFileEditor.SAV.OT,
             Gender = _saveFileEditor.SAV.Gender,
             Language = _saveFileEditor.SAV.Language,
@@ -1540,10 +1548,15 @@ public partial class Gen8SeedFinderForm : Form
                 var stars = GetStarRating(result.Encounter);
                 var shinyType = result.Pokemon.IsShiny ? (result.Pokemon.ShinyXor == 0 ? "Square" : "Star") : "No";
 
+                // Convert to display format (Gen 7+ format)
+                uint pokemonId32 = ((uint)result.Pokemon.SID16 << 16) | result.Pokemon.TID16;
+                uint displayTID = pokemonId32 % 1000000;
+                uint displaySID = pokemonId32 / 1000000;
+
                 writer.WriteLine($"{result.Seed:X16},{wrapper.GetDescription()},{stars},{shinyType}," +
                                $"{result.Pokemon.Nature},{GetAbilityName(result.Pokemon)},{GetIVString(result.Pokemon)}," +
                                $"{(result.Pokemon.CanGigantamax ? "Yes" : "No")},{result.Pokemon.EncryptionConstant:X8}," +
-                               $"{result.Pokemon.PID:X8},{result.Pokemon.TID16},{result.Pokemon.SID16}");
+                               $"{result.Pokemon.PID:X8},{displayTID},{displaySID}");
             }
 
             WinFormsUtil.Alert("Export successful!");

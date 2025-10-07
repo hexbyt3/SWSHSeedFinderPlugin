@@ -433,11 +433,11 @@ namespace SWSHSeedFinderPlugin.GUI
             this.tidLabel.Name = "tidLabel";
             this.tidLabel.Size = new System.Drawing.Size(41, 15);
             this.tidLabel.TabIndex = 8;
-            this.tidLabel.Text = "TID16:";
+            this.tidLabel.Text = "TID:";
 
             // tidNum
             this.tidNum.Location = new System.Drawing.Point(80, 82);
-            this.tidNum.Maximum = new decimal(new int[] { 65535, 0, 0, 0 });
+            this.tidNum.Maximum = new decimal(new int[] { 999999, 0, 0, 0 });
             this.tidNum.Name = "tidNum";
             this.tidNum.Size = new System.Drawing.Size(100, 23);
             this.tidNum.TabIndex = 9;
@@ -448,11 +448,11 @@ namespace SWSHSeedFinderPlugin.GUI
             this.sidLabel.Name = "sidLabel";
             this.sidLabel.Size = new System.Drawing.Size(41, 15);
             this.sidLabel.TabIndex = 10;
-            this.sidLabel.Text = "SID16:";
+            this.sidLabel.Text = "SID:";
 
             // sidNum
             this.sidNum.Location = new System.Drawing.Point(240, 82);
-            this.sidNum.Maximum = new decimal(new int[] { 65535, 0, 0, 0 });
+            this.sidNum.Maximum = new decimal(new int[] { 4294, 0, 0, 0 });
             this.sidNum.Name = "sidNum";
             this.sidNum.Size = new System.Drawing.Size(110, 23);
             this.sidNum.TabIndex = 11;
