@@ -263,3 +263,4 @@ __pycache__/
 # Claude Code
 claude/
 .claude/
+/SWSHSeedFinder.bat

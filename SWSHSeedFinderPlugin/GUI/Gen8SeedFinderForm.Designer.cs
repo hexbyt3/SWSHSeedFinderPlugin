@@ -35,11 +35,19 @@ namespace SWSHSeedFinderPlugin.GUI
             this.formLabel = new System.Windows.Forms.Label();
             this.formCombo = new System.Windows.Forms.ComboBox();
 
+            this.encounterTypeGroup = new System.Windows.Forms.GroupBox();
+            this.encounterTypeLabel = new System.Windows.Forms.Label();
+            this.encounterTypeCombo = new System.Windows.Forms.ComboBox();
+
             this.sourceFilterGroup = new System.Windows.Forms.GroupBox();
             this.normalDensCheck = new System.Windows.Forms.CheckBox();
             this.crystalDensCheck = new System.Windows.Forms.CheckBox();
             this.eventDensCheck = new System.Windows.Forms.CheckBox();
             this.maxLairCheck = new System.Windows.Forms.CheckBox();
+
+            this.wildSourceGroup = new System.Windows.Forms.GroupBox();
+            this.symbolCheck = new System.Windows.Forms.CheckBox();
+            this.hiddenCheck = new System.Windows.Forms.CheckBox();
 
             this.encounterGroup = new System.Windows.Forms.GroupBox();
             this.encounterLabel = new System.Windows.Forms.Label();
@@ -133,20 +141,20 @@ namespace SWSHSeedFinderPlugin.GUI
             // Form
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1100, 700);
+            this.ClientSize = new System.Drawing.Size(1100, 750);
             this.Controls.Add(this.mainPanel);
             this.Controls.Add(this.statusStrip);
-            this.MinimumSize = new System.Drawing.Size(1100, 700);
+            this.MinimumSize = new System.Drawing.Size(1100, 750);
             this.Name = "Gen8SeedFinderForm";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
-            this.Text = "Gen 8 Raid Seed Finder - Enhanced";
+            this.Text = "Gen 8 SW/SH Seed Finder";
 
             // mainPanel
             this.mainPanel.Controls.Add(this.splitContainer);
             this.mainPanel.Dock = System.Windows.Forms.DockStyle.Fill;
             this.mainPanel.Location = new System.Drawing.Point(0, 0);
             this.mainPanel.Name = "mainPanel";
-            this.mainPanel.Size = new System.Drawing.Size(1100, 678);
+            this.mainPanel.Size = new System.Drawing.Size(1100, 728);
             this.mainPanel.TabIndex = 0;
 
             // splitContainer
@@ -155,7 +163,7 @@ namespace SWSHSeedFinderPlugin.GUI
             this.splitContainer.Name = "splitContainer";
             this.splitContainer.Panel1.Controls.Add(this.searchPanel);
             this.splitContainer.Panel2.Controls.Add(this.resultsPanel);
-            this.splitContainer.Size = new System.Drawing.Size(1100, 678);
+            this.splitContainer.Size = new System.Drawing.Size(1100, 728);
             this.splitContainer.SplitterDistance = 380;
             this.splitContainer.TabIndex = 0;
 
@@ -165,13 +173,15 @@ namespace SWSHSeedFinderPlugin.GUI
             this.searchPanel.Controls.Add(this.ivGroup);
             this.searchPanel.Controls.Add(this.criteriaGroup);
             this.searchPanel.Controls.Add(this.encounterGroup);
+            this.searchPanel.Controls.Add(this.wildSourceGroup);
             this.searchPanel.Controls.Add(this.sourceFilterGroup);
+            this.searchPanel.Controls.Add(this.encounterTypeGroup);
             this.searchPanel.Controls.Add(this.speciesGroup);
             this.searchPanel.Dock = System.Windows.Forms.DockStyle.Fill;
             this.searchPanel.Location = new System.Drawing.Point(0, 0);
             this.searchPanel.Name = "searchPanel";
             this.searchPanel.Padding = new System.Windows.Forms.Padding(5);
-            this.searchPanel.Size = new System.Drawing.Size(380, 678);
+            this.searchPanel.Size = new System.Drawing.Size(380, 728);
             this.searchPanel.TabIndex = 0;
 
             // speciesGroup
@@ -236,18 +246,46 @@ namespace SWSHSeedFinderPlugin.GUI
             this.formCombo.Name = "formCombo";
             this.formCombo.Size = new System.Drawing.Size(270, 23);
             this.formCombo.TabIndex = 5;
+            this.formCombo.SelectedIndexChanged += new System.EventHandler(this.FormCombo_SelectedIndexChanged);
+
+            // encounterTypeGroup
+            this.encounterTypeGroup.Controls.Add(this.encounterTypeLabel);
+            this.encounterTypeGroup.Controls.Add(this.encounterTypeCombo);
+            this.encounterTypeGroup.Location = new System.Drawing.Point(8, 114);
+            this.encounterTypeGroup.Name = "encounterTypeGroup";
+            this.encounterTypeGroup.Size = new System.Drawing.Size(360, 55);
+            this.encounterTypeGroup.TabIndex = 6;
+            this.encounterTypeGroup.TabStop = false;
+            this.encounterTypeGroup.Text = "Encounter Type";
+
+            // encounterTypeLabel
+            this.encounterTypeLabel.AutoSize = true;
+            this.encounterTypeLabel.Location = new System.Drawing.Point(10, 25);
+            this.encounterTypeLabel.Name = "encounterTypeLabel";
+            this.encounterTypeLabel.Size = new System.Drawing.Size(34, 15);
+            this.encounterTypeLabel.TabIndex = 0;
+            this.encounterTypeLabel.Text = "Type:";
+
+            // encounterTypeCombo
+            this.encounterTypeCombo.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.encounterTypeCombo.FormattingEnabled = true;
+            this.encounterTypeCombo.Location = new System.Drawing.Point(80, 22);
+            this.encounterTypeCombo.Name = "encounterTypeCombo";
+            this.encounterTypeCombo.Size = new System.Drawing.Size(270, 23);
+            this.encounterTypeCombo.TabIndex = 1;
+            this.encounterTypeCombo.SelectedIndexChanged += new System.EventHandler(this.EncounterTypeCombo_SelectedIndexChanged);
 
             // sourceFilterGroup
             this.sourceFilterGroup.Controls.Add(this.maxLairCheck);
             this.sourceFilterGroup.Controls.Add(this.eventDensCheck);
             this.sourceFilterGroup.Controls.Add(this.crystalDensCheck);
             this.sourceFilterGroup.Controls.Add(this.normalDensCheck);
-            this.sourceFilterGroup.Location = new System.Drawing.Point(8, 134);
+            this.sourceFilterGroup.Location = new System.Drawing.Point(8, 174);
             this.sourceFilterGroup.Name = "sourceFilterGroup";
             this.sourceFilterGroup.Size = new System.Drawing.Size(360, 70);
             this.sourceFilterGroup.TabIndex = 1;
             this.sourceFilterGroup.TabStop = false;
-            this.sourceFilterGroup.Text = "Encounter Sources";
+            this.sourceFilterGroup.Text = "Den Encounter Sources";
 
             // normalDensCheck
             this.normalDensCheck.AutoSize = true;
@@ -297,10 +335,45 @@ namespace SWSHSeedFinderPlugin.GUI
             this.maxLairCheck.UseVisualStyleBackColor = true;
             this.maxLairCheck.CheckedChanged += new System.EventHandler(this.SourceCheckChanged);
 
+            // wildSourceGroup
+            this.wildSourceGroup.Controls.Add(this.symbolCheck);
+            this.wildSourceGroup.Controls.Add(this.hiddenCheck);
+            this.wildSourceGroup.Location = new System.Drawing.Point(8, 174);
+            this.wildSourceGroup.Name = "wildSourceGroup";
+            this.wildSourceGroup.Size = new System.Drawing.Size(360, 55);
+            this.wildSourceGroup.TabIndex = 7;
+            this.wildSourceGroup.TabStop = false;
+            this.wildSourceGroup.Text = "Wild Encounter Sources";
+            this.wildSourceGroup.Visible = false;
+
+            // symbolCheck
+            this.symbolCheck.AutoSize = true;
+            this.symbolCheck.Checked = true;
+            this.symbolCheck.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.symbolCheck.Location = new System.Drawing.Point(10, 25);
+            this.symbolCheck.Name = "symbolCheck";
+            this.symbolCheck.Size = new System.Drawing.Size(68, 19);
+            this.symbolCheck.TabIndex = 0;
+            this.symbolCheck.Text = "Symbol";
+            this.symbolCheck.UseVisualStyleBackColor = true;
+            this.symbolCheck.CheckedChanged += new System.EventHandler(this.SourceCheckChanged);
+
+            // hiddenCheck
+            this.hiddenCheck.AutoSize = true;
+            this.hiddenCheck.Checked = true;
+            this.hiddenCheck.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.hiddenCheck.Location = new System.Drawing.Point(85, 25);
+            this.hiddenCheck.Name = "hiddenCheck";
+            this.hiddenCheck.Size = new System.Drawing.Size(67, 19);
+            this.hiddenCheck.TabIndex = 1;
+            this.hiddenCheck.Text = "Hidden";
+            this.hiddenCheck.UseVisualStyleBackColor = true;
+            this.hiddenCheck.CheckedChanged += new System.EventHandler(this.SourceCheckChanged);
+
             // encounterGroup
             this.encounterGroup.Controls.Add(this.encounterCombo);
             this.encounterGroup.Controls.Add(this.encounterLabel);
-            this.encounterGroup.Location = new System.Drawing.Point(8, 210);
+            this.encounterGroup.Location = new System.Drawing.Point(8, 250);
             this.encounterGroup.Name = "encounterGroup";
             this.encounterGroup.Size = new System.Drawing.Size(360, 55);
             this.encounterGroup.TabIndex = 2;
@@ -336,7 +409,7 @@ namespace SWSHSeedFinderPlugin.GUI
             this.criteriaGroup.Controls.Add(this.abilityLabel);
             this.criteriaGroup.Controls.Add(this.genderCombo);
             this.criteriaGroup.Controls.Add(this.genderLabel);
-            this.criteriaGroup.Location = new System.Drawing.Point(8, 271);
+            this.criteriaGroup.Location = new System.Drawing.Point(8, 310);
             this.criteriaGroup.Name = "criteriaGroup";
             this.criteriaGroup.Size = new System.Drawing.Size(360, 115);
             this.criteriaGroup.TabIndex = 3;
@@ -478,7 +551,7 @@ namespace SWSHSeedFinderPlugin.GUI
             this.ivGroup.Controls.Add(this.ivHpMax);
             this.ivGroup.Controls.Add(this.ivHpMin);
             this.ivGroup.Controls.Add(this.ivHpLabel);
-            this.ivGroup.Location = new System.Drawing.Point(8, 392);
+            this.ivGroup.Location = new System.Drawing.Point(8, 431);
             this.ivGroup.Name = "ivGroup";
             this.ivGroup.Size = new System.Drawing.Size(360, 110);
             this.ivGroup.TabIndex = 4;
@@ -648,7 +721,7 @@ namespace SWSHSeedFinderPlugin.GUI
             this.searchOptionsGroup.Controls.Add(this.startSeedLabel);
             this.searchOptionsGroup.Controls.Add(this.maxSeedsNum);
             this.searchOptionsGroup.Controls.Add(this.maxSeedsLabel);
-            this.searchOptionsGroup.Location = new System.Drawing.Point(8, 508);
+            this.searchOptionsGroup.Location = new System.Drawing.Point(8, 547);
             this.searchOptionsGroup.Name = "searchOptionsGroup";
             this.searchOptionsGroup.Size = new System.Drawing.Size(360, 150);
             this.searchOptionsGroup.TabIndex = 5;
@@ -741,7 +814,7 @@ namespace SWSHSeedFinderPlugin.GUI
             this.resultsGrid.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
             new System.Windows.Forms.DataGridViewTextBoxColumn { HeaderText = "Seed", Width = 130 },
             new System.Windows.Forms.DataGridViewTextBoxColumn { HeaderText = "Encounter", Width = 100 },
-            new System.Windows.Forms.DataGridViewTextBoxColumn { HeaderText = "IVs", Width = 60 },
+            new System.Windows.Forms.DataGridViewTextBoxColumn { HeaderText = "Flawless", Width = 60 },
             new System.Windows.Forms.DataGridViewTextBoxColumn { HeaderText = "Shiny", Width = 50 },
             new System.Windows.Forms.DataGridViewTextBoxColumn { HeaderText = "Nature", Width = 80 },
             new System.Windows.Forms.DataGridViewTextBoxColumn { HeaderText = "Ability", Width = 100 },
@@ -860,11 +933,19 @@ namespace SWSHSeedFinderPlugin.GUI
         private System.Windows.Forms.Label formLabel;
         private System.Windows.Forms.ComboBox formCombo;
 
+        private System.Windows.Forms.GroupBox encounterTypeGroup;
+        private System.Windows.Forms.Label encounterTypeLabel;
+        private System.Windows.Forms.ComboBox encounterTypeCombo;
+
         private System.Windows.Forms.GroupBox sourceFilterGroup;
         private System.Windows.Forms.CheckBox normalDensCheck;
         private System.Windows.Forms.CheckBox crystalDensCheck;
         private System.Windows.Forms.CheckBox eventDensCheck;
         private System.Windows.Forms.CheckBox maxLairCheck;
+
+        private System.Windows.Forms.GroupBox wildSourceGroup;
+        private System.Windows.Forms.CheckBox symbolCheck;
+        private System.Windows.Forms.CheckBox hiddenCheck;
 
         private System.Windows.Forms.GroupBox encounterGroup;
         private System.Windows.Forms.Label encounterLabel;

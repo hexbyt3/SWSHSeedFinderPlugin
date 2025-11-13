@@ -37,6 +37,15 @@ public partial class Gen8SeedFinderForm : Form
     private static readonly HttpClient _httpClient = new();
 
     /// <summary>
+    /// Types of encounters that can be searched.
+    /// </summary>
+    private enum EncounterMode
+    {
+        Raids,
+        Wild
+    }
+
+    /// <summary>
     /// Flags for different encounter sources in Generation 8.
     /// </summary>
     [Flags]
@@ -47,6 +56,8 @@ public partial class Gen8SeedFinderForm : Form
         Crystal = 1 << 1,
         Distribution = 1 << 2,
         Underground = 1 << 3,
+        Symbol = 1 << 4,
+        Hidden = 1 << 5,
     }
 
     /// <summary>
@@ -60,6 +71,7 @@ public partial class Gen8SeedFinderForm : Form
         _pkmEditor = pkmEditor;
         InitializeComponent();
         InitializePreviewPanel();
+        InitializeEncounterTypeCombo();
         LoadSpeciesList();
         LoadTrainerData();
         SetupEventHandlers();
@@ -415,6 +427,44 @@ public partial class Gen8SeedFinderForm : Form
     }
 
     /// <summary>
+    /// Initializes the encounter type combo box.
+    /// </summary>
+    private void InitializeEncounterTypeCombo()
+    {
+        encounterTypeCombo.DisplayMember = "Text";
+        encounterTypeCombo.ValueMember = "Value";
+        encounterTypeCombo.DataSource = new List<ComboItem>
+        {
+            new("Den Encounters", (int)EncounterMode.Raids),
+            new("Wild Encounters", (int)EncounterMode.Wild)
+        };
+        encounterTypeCombo.SelectedIndex = 0;
+    }
+
+    /// <summary>
+    /// Handles encounter type selection change.
+    /// </summary>
+    private void EncounterTypeCombo_SelectedIndexChanged(object? sender, EventArgs e)
+    {
+        if (encounterTypeCombo.SelectedValue is not int modeValue)
+            return;
+
+        var mode = (EncounterMode)modeValue;
+
+        // Toggle visibility of source groups
+        sourceFilterGroup.Visible = mode == EncounterMode.Raids;
+        wildSourceGroup.Visible = mode == EncounterMode.Wild;
+
+        // Reload encounters for selected species
+        if (speciesCombo.SelectedValue is int species)
+        {
+            UpdateEncounterList(species);
+            UpdateSourceDisplay();
+            UpdateEncounterCombo();
+        }
+    }
+
+    /// <summary>
     /// Sets up event handlers and enables double buffering for the results grid.
     /// </summary>
     private void SetupEventHandlers()
@@ -501,6 +551,14 @@ public partial class Gen8SeedFinderForm : Form
     }
 
     /// <summary>
+    /// Handles form selection change event.
+    /// </summary>
+    private void FormCombo_SelectedIndexChanged(object? sender, EventArgs e)
+    {
+        UpdateEncounterCombo();
+    }
+
+    /// <summary>
     /// Updates the form list for the selected species.
     /// </summary>
     /// <param name="species">Species ID</param>
@@ -523,48 +581,86 @@ public partial class Gen8SeedFinderForm : Form
         _availableSources = EncounterSource.None;
 
         var selectedSources = GetSelectedSources();
+        var encounterMode = GetCurrentEncounterMode();
 
-        // Get normal raid encounters
-        if (selectedSources.HasFlag(EncounterSource.Normal))
+        if (encounterMode == EncounterMode.Raids)
         {
-            var normalRaidsSW = GetNormalRaidEncounters((ushort)species, GameVersion.SW);
-            var normalRaidsSH = GetNormalRaidEncounters((ushort)species, GameVersion.SH);
-            encounters.AddRange(normalRaidsSW.Select(e => new EncounterWrapper(e, GameVersion.SW)));
-            encounters.AddRange(normalRaidsSH.Select(e => new EncounterWrapper(e, GameVersion.SH)));
-            if (normalRaidsSW.Count > 0 || normalRaidsSH.Count > 0)
-                _availableSources |= EncounterSource.Normal;
+            // Get normal raid encounters
+            if (selectedSources.HasFlag(EncounterSource.Normal))
+            {
+                var normalRaidsSW = GetNormalRaidEncounters((ushort)species, GameVersion.SW);
+                var normalRaidsSH = GetNormalRaidEncounters((ushort)species, GameVersion.SH);
+                encounters.AddRange(normalRaidsSW.Select(e => new EncounterWrapper(e, GameVersion.SW)));
+                encounters.AddRange(normalRaidsSH.Select(e => new EncounterWrapper(e, GameVersion.SH)));
+                if (normalRaidsSW.Count > 0 || normalRaidsSH.Count > 0)
+                    _availableSources |= EncounterSource.Normal;
+            }
+
+            // Get crystal encounters
+            if (selectedSources.HasFlag(EncounterSource.Crystal))
+            {
+                var crystalRaids = GetCrystalEncounters((ushort)species);
+                encounters.AddRange(crystalRaids.Select(e => new EncounterWrapper(e, GameVersion.SWSH)));
+                if (crystalRaids.Count > 0)
+                    _availableSources |= EncounterSource.Crystal;
+            }
+
+            // Get distribution encounters
+            if (selectedSources.HasFlag(EncounterSource.Distribution))
+            {
+                var distRaidsSW = GetDistributionEncounters((ushort)species, GameVersion.SW);
+                var distRaidsSH = GetDistributionEncounters((ushort)species, GameVersion.SH);
+                encounters.AddRange(distRaidsSW.Select(e => new EncounterWrapper(e, GameVersion.SW)));
+                encounters.AddRange(distRaidsSH.Select(e => new EncounterWrapper(e, GameVersion.SH)));
+                if (distRaidsSW.Count > 0 || distRaidsSH.Count > 0)
+                    _availableSources |= EncounterSource.Distribution;
+            }
+
+            // Get underground encounters
+            if (selectedSources.HasFlag(EncounterSource.Underground))
+            {
+                var undergroundRaids = GetUndergroundEncounters((ushort)species);
+                encounters.AddRange(undergroundRaids.Select(e => new EncounterWrapper(e, GameVersion.SWSH)));
+                if (undergroundRaids.Count > 0)
+                    _availableSources |= EncounterSource.Underground;
+            }
         }
-
-        // Get crystal encounters
-        if (selectedSources.HasFlag(EncounterSource.Crystal))
+        else // Wild Encounters
         {
-            var crystalRaids = GetCrystalEncounters((ushort)species);
-            encounters.AddRange(crystalRaids.Select(e => new EncounterWrapper(e, GameVersion.SWSH)));
-            if (crystalRaids.Count > 0)
-                _availableSources |= EncounterSource.Crystal;
-        }
+            // Get symbol encounters
+            if (selectedSources.HasFlag(EncounterSource.Symbol))
+            {
+                var symbolSW = GetWildEncounters((ushort)species, GameVersion.SW, true);
+                var symbolSH = GetWildEncounters((ushort)species, GameVersion.SH, true);
+                encounters.AddRange(symbolSW.Select(e => new EncounterWrapper(e, GameVersion.SW)));
+                encounters.AddRange(symbolSH.Select(e => new EncounterWrapper(e, GameVersion.SH)));
+                if (symbolSW.Count > 0 || symbolSH.Count > 0)
+                    _availableSources |= EncounterSource.Symbol;
+            }
 
-        // Get distribution encounters
-        if (selectedSources.HasFlag(EncounterSource.Distribution))
-        {
-            var distRaidsSW = GetDistributionEncounters((ushort)species, GameVersion.SW);
-            var distRaidsSH = GetDistributionEncounters((ushort)species, GameVersion.SH);
-            encounters.AddRange(distRaidsSW.Select(e => new EncounterWrapper(e, GameVersion.SW)));
-            encounters.AddRange(distRaidsSH.Select(e => new EncounterWrapper(e, GameVersion.SH)));
-            if (distRaidsSW.Count > 0 || distRaidsSH.Count > 0)
-                _availableSources |= EncounterSource.Distribution;
-        }
-
-        // Get underground encounters
-        if (selectedSources.HasFlag(EncounterSource.Underground))
-        {
-            var undergroundRaids = GetUndergroundEncounters((ushort)species);
-            encounters.AddRange(undergroundRaids.Select(e => new EncounterWrapper(e, GameVersion.SWSH)));
-            if (undergroundRaids.Count > 0)
-                _availableSources |= EncounterSource.Underground;
+            // Get hidden encounters
+            if (selectedSources.HasFlag(EncounterSource.Hidden))
+            {
+                var hiddenSW = GetWildEncounters((ushort)species, GameVersion.SW, false);
+                var hiddenSH = GetWildEncounters((ushort)species, GameVersion.SH, false);
+                encounters.AddRange(hiddenSW.Select(e => new EncounterWrapper(e, GameVersion.SW)));
+                encounters.AddRange(hiddenSH.Select(e => new EncounterWrapper(e, GameVersion.SH)));
+                if (hiddenSW.Count > 0 || hiddenSH.Count > 0)
+                    _availableSources |= EncounterSource.Hidden;
+            }
         }
 
         _cachedEncounters = encounters;
+    }
+
+    /// <summary>
+    /// Gets the current encounter mode (Raids or Wild).
+    /// </summary>
+    private EncounterMode GetCurrentEncounterMode()
+    {
+        if (encounterTypeCombo.SelectedValue is int modeValue)
+            return (EncounterMode)modeValue;
+        return EncounterMode.Raids;
     }
 
     /// <summary>
@@ -574,11 +670,22 @@ public partial class Gen8SeedFinderForm : Form
     private EncounterSource GetSelectedSources()
     {
         var sources = EncounterSource.None;
-        if (normalDensCheck.Checked) sources |= EncounterSource.Normal;
-        if (crystalDensCheck.Checked) sources |= EncounterSource.Crystal;
-        if (eventDensCheck.Checked) sources |= EncounterSource.Distribution;
-        if (maxLairCheck.Checked) sources |= EncounterSource.Underground;
-        return sources == EncounterSource.None ? EncounterSource.Normal | EncounterSource.Crystal | EncounterSource.Distribution | EncounterSource.Underground : sources;
+        var mode = GetCurrentEncounterMode();
+
+        if (mode == EncounterMode.Raids)
+        {
+            if (normalDensCheck.Checked) sources |= EncounterSource.Normal;
+            if (crystalDensCheck.Checked) sources |= EncounterSource.Crystal;
+            if (eventDensCheck.Checked) sources |= EncounterSource.Distribution;
+            if (maxLairCheck.Checked) sources |= EncounterSource.Underground;
+            return sources == EncounterSource.None ? EncounterSource.Normal | EncounterSource.Crystal | EncounterSource.Distribution | EncounterSource.Underground : sources;
+        }
+        else // Wild
+        {
+            if (symbolCheck.Checked) sources |= EncounterSource.Symbol;
+            if (hiddenCheck.Checked) sources |= EncounterSource.Hidden;
+            return sources == EncounterSource.None ? EncounterSource.Symbol | EncounterSource.Hidden : sources;
+        }
     }
 
     /// <summary>
@@ -617,6 +724,10 @@ public partial class Gen8SeedFinderForm : Form
             sources.Add("Event");
         if (_availableSources.HasFlag(EncounterSource.Underground))
             sources.Add("Max Lair");
+        if (_availableSources.HasFlag(EncounterSource.Symbol))
+            sources.Add("Symbol");
+        if (_availableSources.HasFlag(EncounterSource.Hidden))
+            sources.Add("Hidden");
 
         statusLabel.Text = sources.Count > 0
             ? $"Available in: {string.Join(", ", sources)}"
@@ -694,6 +805,32 @@ public partial class Gen8SeedFinderForm : Form
         {
             if (enc.Species == species)
                 encounters.Add(enc);
+        }
+
+        return encounters;
+    }
+
+    /// <summary>
+    /// Gets wild encounters for a specific species and game version.
+    /// </summary>
+    /// <param name="species">Species ID</param>
+    /// <param name="version">Game version</param>
+    /// <param name="symbol">True for symbol encounters, false for hidden</param>
+    /// <returns>List of wild encounters</returns>
+    private static List<EncounterSlot8> GetWildEncounters(ushort species, GameVersion version, bool symbol)
+    {
+        var encounters = new List<EncounterSlot8>();
+        var areas = symbol
+            ? (version == GameVersion.SW ? Encounters8.SlotsSW_Symbol : Encounters8.SlotsSH_Symbol)
+            : (version == GameVersion.SW ? Encounters8.SlotsSW_Hidden : Encounters8.SlotsSH_Hidden);
+
+        foreach (var area in areas)
+        {
+            foreach (var slot in area.Slots)
+            {
+                if (slot.Species == species)
+                    encounters.Add(slot);
+            }
         }
 
         return encounters;
@@ -894,15 +1031,55 @@ public partial class Gen8SeedFinderForm : Form
         if (!TryParseSeedRange(out var startSeed, out var endSeed))
             return;
 
-        ulong totalSeeds = endSeed - startSeed + 1;
-        ulong seedsChecked = 0;
-        ulong lastProgressUpdate = 0;
-        const ulong updateInterval = 50000; // Update less frequently
-
         var tr = GetTrainerInfo();
         var encountersToCheck = GetEncountersToCheck(form, encounterIndex, selectedEncounterText);
 
-        // Use parallel processing for better performance
+        // Determine if we're searching wild or raid encounters
+        bool isWildSearch = encountersToCheck.Count > 0 && encountersToCheck[0].IsWildEncounter;
+
+        if (isWildSearch)
+        {
+            // Wild encounters use 32-bit seeds
+            SearchWildSeeds(form, criteria, ivRanges, maxResults, token, (uint)startSeed, (uint)endSeed, tr, encountersToCheck, results);
+        }
+        else
+        {
+            // Raid encounters use 64-bit seeds
+            SearchRaidSeeds(form, criteria, ivRanges, maxResults, token, startSeed, endSeed, tr, encountersToCheck, results);
+        }
+
+        lock (_resultsLock)
+        {
+            _results = results;
+        }
+
+        try
+        {
+            this.Invoke(() =>
+            {
+                if (!IsDisposed && !statusLabel.IsDisposed && !progressBar.IsDisposed)
+                {
+                    statusLabel.Text = $"Found {results.Count} matches";
+                    progressBar.Value = 100;
+                }
+            });
+        }
+        catch (ObjectDisposedException)
+        {
+            // Form was disposed while updating, ignore
+        }
+    }
+
+    /// <summary>
+    /// Searches for raid seeds (64-bit).
+    /// </summary>
+    private void SearchRaidSeeds(byte form, EncounterCriteria criteria, IVRange[] ivRanges, int maxResults, CancellationToken token, ulong startSeed, ulong endSeed, ITrainerInfo tr, List<EncounterWrapper> encountersToCheck, List<SeedResult> results)
+    {
+        ulong totalSeeds = endSeed - startSeed + 1;
+        ulong seedsChecked = 0;
+        ulong lastProgressUpdate = 0;
+        const ulong updateInterval = 50000;
+
         var parallelOptions = new ParallelOptions
         {
             CancellationToken = token,
@@ -987,26 +1164,96 @@ public partial class Gen8SeedFinderForm : Form
                 }
             }
         }
+    }
 
-        lock (_resultsLock)
-        {
-            _results = results;
-        }
+    /// <summary>
+    /// Searches for wild seeds (32-bit).
+    /// </summary>
+    private void SearchWildSeeds(byte form, EncounterCriteria criteria, IVRange[] ivRanges, int maxResults, CancellationToken token, uint startSeed, uint endSeed, ITrainerInfo tr, List<EncounterWrapper> encountersToCheck, List<SeedResult> results)
+    {
+        uint totalSeeds = endSeed - startSeed + 1;
+        uint seedsChecked = 0;
+        uint lastProgressUpdate = 0;
+        const uint updateInterval = 50000;
 
-        try
+        var parallelOptions = new ParallelOptions
         {
-            this.Invoke(() =>
+            CancellationToken = token,
+            MaxDegreeOfParallelism = Environment.ProcessorCount
+        };
+
+        var seedBatch = new List<uint>();
+        const int batchSize = 10000;
+
+        for (uint seed = startSeed; seed <= endSeed && results.Count < maxResults && !token.IsCancellationRequested; seed++)
+        {
+            seedBatch.Add(seed);
+
+            if (seedBatch.Count >= batchSize || seed == endSeed)
             {
-                if (!IsDisposed && !statusLabel.IsDisposed && !progressBar.IsDisposed)
+                var batchResults = new List<SeedResult>();
+
+                Parallel.ForEach(seedBatch, parallelOptions, currentSeed =>
                 {
-                    statusLabel.Text = $"Found {results.Count} matches after checking {seedsChecked:N0} seeds";
-                    progressBar.Value = 100;
+                    foreach (var wrapper in encountersToCheck)
+                    {
+                        if (wrapper.Encounter is not EncounterSlot8 slot)
+                            continue;
+
+                        // Try to generate wild Pokemon
+                        var pk = TryGenerateWildPokemon(slot, currentSeed, criteria, tr, form, ivRanges);
+                        if (pk == null)
+                            continue;
+
+                        var result = new SeedResult
+                        {
+                            Seed = currentSeed,
+                            Encounter = wrapper.Encounter,
+                            Pokemon = pk
+                        };
+
+                        lock (batchResults)
+                        {
+                            batchResults.Add(result);
+                        }
+                        break;
+                    }
+                });
+
+                // Add batch results
+                foreach (var result in batchResults.OrderBy(r => r.Seed))
+                {
+                    if (results.Count >= maxResults)
+                        break;
+
+                    results.Add(result);
+                    AddResultToGrid(result);
                 }
-            });
-        }
-        catch (ObjectDisposedException)
-        {
-            // Form was disposed while updating, ignore
+
+                seedsChecked += (uint)seedBatch.Count;
+                seedBatch.Clear();
+
+                if (seedsChecked - lastProgressUpdate >= updateInterval)
+                {
+                    lastProgressUpdate = seedsChecked;
+                    try
+                    {
+                        this.Invoke(() =>
+                        {
+                            if (!IsDisposed && !progressBar.IsDisposed && !statusLabel.IsDisposed)
+                            {
+                                var progressPercent = (int)((seedsChecked / (double)totalSeeds) * 100);
+                                progressBar.Value = Math.Min(progressPercent, 100);
+                                statusLabel.Text = $"Checked {seedsChecked:N0} ({progressPercent}%), found {results.Count}";
+                            }
+                        });
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        // Form was disposed while updating, ignore
+                    }
+                }
+            }
         }
     }
 
@@ -1049,19 +1296,27 @@ public partial class Gen8SeedFinderForm : Form
         uint pid;
         bool isShiny;
         {
-            var trID = (uint)rng.NextInt();
+            var trID = (uint)rng.NextInt(); // Generated OTID from seed
             pid = (uint)rng.NextInt();
             var xor = PKHeX.Core.ShinyUtil.GetShinyXor(pid, trID);
             isShiny = xor < 16;
         }
 
-        // Check shiny criteria first (fastest check)
+        // Adjust PID to match player's actual ID32 (preserving shiny/non-shiny state from seed)
+        // xorType 0 = square shiny, 1 = star shiny (using 0 as default since we'll check the actual XOR)
+        PKHeX.Core.ShinyUtil.ForceShinyState(isShiny, ref pid, tr.ID32, 0);
+
+        // Calculate final shiny XOR with player's actual ID
+        var finalShinyXor = PKHeX.Core.ShinyUtil.GetShinyXor(pid, tr.ID32);
+        var finalIsShiny = finalShinyXor < 16;
+
+        // Check shiny criteria (now based on player's actual ID)
         bool matchesShiny = criteria.Shiny switch
         {
-            Shiny.Never => !isShiny,
-            Shiny.Always => isShiny,
-            Shiny.AlwaysSquare => isShiny && (pid ^ tr.ID32) >> 16 == 0,
-            Shiny.AlwaysStar => isShiny && (pid ^ tr.ID32) >> 16 > 0 && (pid ^ tr.ID32) >> 16 < 16,
+            Shiny.Never => !finalIsShiny,
+            Shiny.Always => finalIsShiny,
+            Shiny.AlwaysSquare => finalIsShiny && finalShinyXor == 0,
+            Shiny.AlwaysStar => finalIsShiny && finalShinyXor > 0 && finalShinyXor < 16,
             _ => true
         };
 
@@ -1323,6 +1578,152 @@ public partial class Gen8SeedFinderForm : Form
     }
 
     /// <summary>
+    /// Tries to generate a wild Pokémon from an encounter and seed.
+    /// </summary>
+    /// <param name="slot">Wild encounter slot</param>
+    /// <param name="seed">Seed value (32-bit)</param>
+    /// <param name="criteria">Generation criteria</param>
+    /// <param name="tr">Trainer information</param>
+    /// <param name="desiredForm">Desired form</param>
+    /// <param name="ivRanges">IV ranges to validate</param>
+    /// <returns>Generated PK8 if successful, null otherwise</returns>
+    private PK8? TryGenerateWildPokemon(EncounterSlot8 slot, uint seed, EncounterCriteria criteria, ITrainerInfo tr, byte desiredForm, IVRange[] ivRanges)
+    {
+        try
+        {
+            // Generate Pokemon using the slot's ConvertToPKM
+            var pk8 = slot.ConvertToPKM(tr, criteria);
+
+            // Set the encryption constant to the seed (wild encounters store seed as EC)
+            var rng = new Xoroshiro128Plus(seed);
+            pk8.EncryptionConstant = (uint)rng.NextInt();
+
+            // Generate PID
+            var pid = (uint)rng.NextInt();
+
+            // Check shiny type
+            var xor = PKHeX.Core.ShinyUtil.GetShinyXor(pk8.ID32, pid);
+            var isShiny = xor < 16;
+
+            // Handle shiny forcing based on criteria
+            if (criteria.Shiny == Shiny.Never && isShiny)
+            {
+                pid ^= 0x10000000; // Make non-shiny
+            }
+            else if (criteria.Shiny != Shiny.Never && criteria.Shiny != Shiny.Random && !isShiny)
+            {
+                // Force shiny (square by default)
+                var low = pid & 0xFFFF;
+                pid = (((uint)0 ^ (uint)pk8.TID16 ^ (uint)pk8.SID16 ^ low) << 16) | low;
+            }
+
+            pk8.PID = pid;
+
+            // Determine flawless IV count (Symbol/Fishing can have 0-3)
+            int flawless = slot.Parent.PermitCrossover || (slot.Weather & AreaWeather8.Fishing) != 0
+                ? 0 // Will validate with Overworld8RNG
+                : 0; // Hidden encounters typically have 0 flawless
+
+            // Generate IVs and track RNG state for height/weight
+            Span<int> ivs = stackalloc int[6];
+            ivs.Fill(-1);
+            Xoroshiro128Plus finalRng = default;
+
+            // For symbol/fishing, we need to try different flawless counts (0-3)
+            if (slot.Parent.PermitCrossover || (slot.Weather & AreaWeather8.Fishing) != 0)
+            {
+                // Try to match IVs with the wild RNG pattern
+                for (int flawlessAttempt = 0; flawlessAttempt <= 3; flawlessAttempt++)
+                {
+                    var testRng = new Xoroshiro128Plus(seed);
+                    testRng.NextInt(); // EC
+                    testRng.NextInt(); // PID
+
+                    ivs.Fill(-1);
+                    for (int i = 0; i < flawlessAttempt; i++)
+                    {
+                        int index = (int)testRng.NextInt(6);
+                        while (ivs[index] != -1)
+                            index = (int)testRng.NextInt(6);
+                        ivs[index] = 31;
+                    }
+
+                    for (int i = 0; i < 6; i++)
+                    {
+                        if (ivs[i] == -1)
+                            ivs[i] = (int)testRng.NextInt(32);
+                    }
+
+                    // Check if IVs match our criteria
+                    if (CheckIVRangesSpan(ivs, ivRanges))
+                    {
+                        flawless = flawlessAttempt;
+                        finalRng = testRng; // Save RNG state after IV generation
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                // Hidden encounters - just generate random IVs
+                var testRng = new Xoroshiro128Plus(seed);
+                testRng.NextInt(); // EC
+                testRng.NextInt(); // PID
+
+                for (int i = 0; i < 6; i++)
+                    ivs[i] = (int)testRng.NextInt(32);
+
+                finalRng = testRng; // Save RNG state after IV generation
+            }
+
+            // Set IVs
+            pk8.IV_HP = ivs[0];
+            pk8.IV_ATK = ivs[1];
+            pk8.IV_DEF = ivs[2];
+            pk8.IV_SPA = ivs[3];
+            pk8.IV_SPD = ivs[4];
+            pk8.IV_SPE = ivs[5];
+
+            // Generate Height and Weight scalars from seed (required for overworld correlation)
+            // These must be generated after IVs in the RNG sequence
+            // Each scalar requires TWO RNG calls
+            // Use the finalRng state that's already advanced past EC, PID, and IVs
+            pk8.HeightScalar = (byte)(finalRng.NextInt(0x81) + finalRng.NextInt(0x80));
+            pk8.WeightScalar = (byte)(finalRng.NextInt(0x81) + finalRng.NextInt(0x80));
+
+            // Check if generated IVs match our ranges
+            if (!CheckIVRanges(pk8, ivRanges))
+                return null;
+
+            // Check shiny criteria
+            bool matchesShiny = criteria.Shiny switch
+            {
+                Shiny.Never => !pk8.IsShiny,
+                Shiny.Always => pk8.IsShiny,
+                Shiny.AlwaysSquare => pk8.IsShiny && pk8.ShinyXor == 0,
+                Shiny.AlwaysStar => pk8.IsShiny && pk8.ShinyXor > 0 && pk8.ShinyXor < 16,
+                _ => true
+            };
+
+            if (!matchesShiny)
+                return null;
+
+            // Check form
+            if (pk8.Form != desiredForm && slot.Form < EncounterUtil.FormDynamic)
+                return null;
+
+            // Calculate stats
+            pk8.ResetPartyStats();
+
+            return pk8;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Checks if a generated Pokémon matches the search criteria.
     /// </summary>
     /// <param name="pk">Generated Pokémon</param>
@@ -1461,6 +1862,7 @@ public partial class Gen8SeedFinderForm : Form
             EncounterStatic8ND nd => $"{nd.FlawlessIVCount}IV",
             EncounterStatic8NC nc => $"{nc.FlawlessIVCount}IV",
             EncounterStatic8U u => $"{u.FlawlessIVCount}IV",
+            EncounterSlot8 s => (s.Parent.PermitCrossover || (s.Weather & AreaWeather8.Fishing) != 0) ? "0-3IV" : "0IV",
             _ => "?"
         };
     }
@@ -1654,8 +2056,14 @@ public partial class Gen8SeedFinderForm : Form
             EncounterStatic8NC nc => nc.Form,
             EncounterStatic8ND nd => nd.Form,
             EncounterStatic8U u => u.Form,
+            EncounterSlot8 s => s.Form,
             _ => 0
         };
+
+        /// <summary>
+        /// Returns true if this is a wild encounter (32-bit seed).
+        /// </summary>
+        public bool IsWildEncounter => Encounter is EncounterSlot8;
 
         /// <summary>
         /// Gets a full description of the encounter.
@@ -1669,6 +2077,7 @@ public partial class Gen8SeedFinderForm : Form
                 EncounterStatic8NC => "Crystal Den",
                 EncounterStatic8ND nd => $"{GetVersionString()} Event #{nd.Index}",
                 EncounterStatic8U => "Max Lair",
+                EncounterSlot8 s => $"{GetVersionString()} {GetSlotTypeString(s)} - Location {s.Location}",
                 _ => "Unknown"
             };
         }
@@ -1685,8 +2094,21 @@ public partial class Gen8SeedFinderForm : Form
                 EncounterStatic8NC => "Crystal",
                 EncounterStatic8ND => $"{GetVersionString()} Event",
                 EncounterStatic8U => "Max Lair",
+                EncounterSlot8 s => $"{GetVersionString()} {GetSlotTypeString(s)}",
                 _ => "?"
             };
+        }
+
+        /// <summary>
+        /// Gets the slot type string for wild encounters.
+        /// </summary>
+        private static string GetSlotTypeString(EncounterSlot8 slot)
+        {
+            if (slot.Parent.PermitCrossover)
+                return "Symbol";
+            if ((slot.Weather & AreaWeather8.Fishing) != 0)
+                return "Fishing";
+            return "Hidden";
         }
 
         /// <summary>
