@@ -1,3 +1,6 @@
+> [!IMPORTANT]  
+> This plugin requires my fork of [PKHeX](https://github.com/hexbyt3/PKHeXth/releases/) to work right.
+
 ![GitHub Release](https://img.shields.io/github/v/release/hexbyt3/Swshseedfinderplugin)
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/hexbyt3/Swshseedfinderplugin/total?color=violet)
 
