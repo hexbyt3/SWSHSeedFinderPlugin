@@ -7,6 +7,9 @@
     <UseWindowsForms>true</UseWindowsForms>
   </PropertyGroup>
 
+  <!-- Import local.props if it exists (gitignored, contains private paths) -->
+  <Import Project="..\local.props" Condition="Exists('..\local.props')" />
+
   <ItemGroup>
     <Folder Include="Deps\" />
   </ItemGroup>
@@ -15,4 +18,10 @@
       <HintPath>Deps\PKHeX.Core.dll</HintPath>
     </Reference>
   </ItemGroup>
+
+  <!-- Auto-deploy to PKHeX plugins folder after build (if PKHeXPluginsPath is defined) -->
+  <Target Name="DeployToPlugins" AfterTargets="Build" Condition="'$(PKHeXPluginsPath)' != ''">
+    <Message Importance="high" Text="Deploying $(AssemblyName).dll to $(PKHeXPluginsPath)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(PKHeXPluginsPath)" SkipUnchangedFiles="false" />
+  </Target>
 </Project>

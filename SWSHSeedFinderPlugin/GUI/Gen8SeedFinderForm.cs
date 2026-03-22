@@ -1110,8 +1110,9 @@ public partial class Gen8SeedFinderForm : Form
                         if (pk == null)
                             continue;
 
-                        // Double-check IVs match what we validated (in case of RNG differences)
-                        if (!CheckIVRanges(pk, ivRanges))
+                        // Verify generated Pokemon matches all criteria (nature, shiny, gender, IVs)
+                        // GenerateSeed64 overwrites PINGA from the seed, so we must re-check
+                        if (!CheckPokemonMatchesCriteria(pk, criteria, ivRanges))
                             continue;
 
                         var result = new SeedResult
@@ -1311,16 +1312,7 @@ public partial class Gen8SeedFinderForm : Form
         var finalIsShiny = finalShinyXor < 16;
 
         // Check shiny criteria (now based on player's actual ID)
-        bool matchesShiny = criteria.Shiny switch
-        {
-            Shiny.Never => !finalIsShiny,
-            Shiny.Always => finalIsShiny,
-            Shiny.AlwaysSquare => finalIsShiny && finalShinyXor == 0,
-            Shiny.AlwaysStar => finalIsShiny && finalShinyXor > 0 && finalShinyXor < 16,
-            _ => true
-        };
-
-        if (!matchesShiny)
+        if (criteria.IsSpecifiedShiny() && !criteria.IsSatisfiedShiny(finalShinyXor, 16))
             return false;
 
         // Quick IV check
@@ -1345,39 +1337,39 @@ public partial class Gen8SeedFinderForm : Form
         if (!CheckIVRangesSpan(ivs, ivRanges))
             return false;
 
-        // Check ability if specified
+        // Must always consume ability from RNG to keep state in sync (matches RaidRNG.TryApply sequence)
+        int ability = param.Ability switch
+        {
+            AbilityPermission.Any12H => (int)rng.NextInt(3),
+            AbilityPermission.Any12 => (int)rng.NextInt(2),
+            _ => param.Ability.GetSingleValue(),
+        };
+
         if (criteria.Ability != AbilityPermission.Any12H)
         {
-            int ability = param.Ability switch
-            {
-                AbilityPermission.Any12H => (int)rng.NextInt(3),
-                AbilityPermission.Any12 => (int)rng.NextInt(2),
-                _ => param.Ability.GetSingleValue(),
-            };
-
             if (!CheckAbilityQuick(ability, criteria.Ability))
                 return false;
         }
 
-        // Check gender if specified
+        // Must always consume gender from RNG to keep state in sync
+        byte gender = param.GenderRatio switch
+        {
+            PersonalInfo.RatioMagicGenderless => 2,
+            PersonalInfo.RatioMagicFemale => 1,
+            PersonalInfo.RatioMagicMale => 0,
+            _ => rng.NextInt(253) + 1 < param.GenderRatio ? (byte)1 : (byte)0,
+        };
+
         if (criteria.Gender != Gender.Random)
         {
-            byte gender = param.GenderRatio switch
-            {
-                PersonalInfo.RatioMagicGenderless => 2,
-                PersonalInfo.RatioMagicFemale => 1,
-                PersonalInfo.RatioMagicMale => 0,
-                _ => rng.NextInt(253) + 1 < param.GenderRatio ? (byte)1 : (byte)0,
-            };
-
             if (gender != (byte)criteria.Gender)
                 return false;
         }
 
         // Check nature if specified
-        if (criteria.Nature != Nature.Random)
+        if (criteria.Nature.IsFixed())
         {
-            var nature = param.Nature != Nature.Random ? param.Nature : (Nature)rng.NextInt(25);
+            var nature = param.Nature.IsFixed() ? param.Nature : (Nature)rng.NextInt(25);
             if (nature != criteria.Nature)
                 return false;
         }
@@ -1696,16 +1688,7 @@ public partial class Gen8SeedFinderForm : Form
                 return null;
 
             // Check shiny criteria
-            bool matchesShiny = criteria.Shiny switch
-            {
-                Shiny.Never => !pk8.IsShiny,
-                Shiny.Always => pk8.IsShiny,
-                Shiny.AlwaysSquare => pk8.IsShiny && pk8.ShinyXor == 0,
-                Shiny.AlwaysStar => pk8.IsShiny && pk8.ShinyXor > 0 && pk8.ShinyXor < 16,
-                _ => true
-            };
-
-            if (!matchesShiny)
+            if (criteria.IsSpecifiedShiny() && !criteria.IsSatisfiedShiny(PKHeX.Core.ShinyUtil.GetShinyXor(pk8.PID, pk8.ID32), 16))
                 return null;
 
             // Check form
@@ -1733,16 +1716,7 @@ public partial class Gen8SeedFinderForm : Form
     private bool CheckPokemonMatchesCriteria(PK8 pk, EncounterCriteria criteria, IVRange[] ivRanges)
     {
         // Check shiny
-        bool matchesShiny = criteria.Shiny switch
-        {
-            Shiny.Never => !pk.IsShiny,
-            Shiny.Always => pk.IsShiny,
-            Shiny.AlwaysSquare => pk.IsShiny && pk.ShinyXor == 0,
-            Shiny.AlwaysStar => pk.IsShiny && pk.ShinyXor > 0 && pk.ShinyXor < 16,
-            _ => true
-        };
-
-        if (!matchesShiny)
+        if (criteria.IsSpecifiedShiny() && !criteria.IsSatisfiedShiny(PKHeX.Core.ShinyUtil.GetShinyXor(pk.PID, pk.ID32), 16))
             return false;
 
         // Check gender
@@ -1750,7 +1724,7 @@ public partial class Gen8SeedFinderForm : Form
             return false;
 
         // Check nature
-        if (criteria.Nature != Nature.Random && pk.Nature != criteria.Nature)
+        if (criteria.Nature.IsFixed() && pk.Nature != criteria.Nature)
             return false;
 
         // Check IVs
