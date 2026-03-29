@@ -628,9 +628,11 @@ public partial class Gen8SeedFinderForm : Form
         else // Wild Encounters
         {
             var form = (byte)(formCombo.SelectedValue as int? ?? 0);
+
+            // Also grab encounters for pre-evolutions that can evolve into the selected species in Galar.
+            // e.g. selecting Weezing-Galar will also include Koffing's wild locations.
             var preEvos = EvolutionTree.Evolves8.Reverse.GetPreEvolutions((ushort)species, form);
 
-            // Get symbol encounters
             if (selectedSources.HasFlag(EncounterSource.Symbol))
             {
                 var symbolSW = GetWildEncounters((ushort)species, GameVersion.SW, true);
@@ -652,7 +654,6 @@ public partial class Gen8SeedFinderForm : Form
                     _availableSources |= EncounterSource.Symbol;
             }
 
-            // Get hidden encounters
             if (selectedSources.HasFlag(EncounterSource.Hidden))
             {
                 var hiddenSW = GetWildEncounters((ushort)species, GameVersion.SW, false);
@@ -1065,7 +1066,7 @@ public partial class Gen8SeedFinderForm : Form
         if (isWildSearch)
         {
             // Wild encounters use 32-bit seeds
-            SearchWildSeeds(form, criteria, ivRanges, maxResults, token, (uint)startSeed, (uint)endSeed, tr, encountersToCheck, results);
+            SearchWildSeeds((ushort)species, form, criteria, ivRanges, maxResults, token, (uint)startSeed, (uint)endSeed, tr, encountersToCheck, results);
         }
         else
         {
@@ -1192,10 +1193,7 @@ public partial class Gen8SeedFinderForm : Form
         }
     }
 
-    /// <summary>
-    /// Searches for wild seeds (32-bit).
-    /// </summary>
-    private void SearchWildSeeds(byte form, EncounterCriteria criteria, IVRange[] ivRanges, int maxResults, CancellationToken token, uint startSeed, uint endSeed, ITrainerInfo tr, List<EncounterWrapper> encountersToCheck, List<SeedResult> results)
+    private void SearchWildSeeds(ushort targetSpecies, byte form, EncounterCriteria criteria, IVRange[] ivRanges, int maxResults, CancellationToken token, uint startSeed, uint endSeed, ITrainerInfo tr, List<EncounterWrapper> encountersToCheck, List<SeedResult> results)
     {
         uint totalSeeds = endSeed - startSeed + 1;
         uint seedsChecked = 0;
@@ -1227,7 +1225,7 @@ public partial class Gen8SeedFinderForm : Form
                             continue;
 
                         // Try to generate wild Pokemon
-                        var pk = TryGenerateWildPokemon(slot, currentSeed, criteria, tr, form, ivRanges, wrapper.IsPreEvolution);
+                        var pk = TryGenerateWildPokemon(slot, currentSeed, criteria, tr, targetSpecies, form, ivRanges, wrapper.IsPreEvolution);
                         if (pk == null)
                             continue;
 
@@ -1595,69 +1593,78 @@ public partial class Gen8SeedFinderForm : Form
     }
 
     /// <summary>
-    /// Tries to generate a wild Pokémon from an encounter and seed.
+    /// Tries to generate a wild Pokémon from the given encounter slot and seed,
+    /// matching the overworld RNG sequence that PKHeX validates (Overworld8RNG).
+    /// If the encounter is for a pre-evolution, the result is evolved into the target species.
     /// </summary>
-    /// <param name="slot">Wild encounter slot</param>
-    /// <param name="seed">Seed value (32-bit)</param>
-    /// <param name="criteria">Generation criteria</param>
-    /// <param name="tr">Trainer information</param>
-    /// <param name="desiredForm">Desired form</param>
-    /// <param name="ivRanges">IV ranges to validate</param>
-    /// <returns>Generated PK8 if successful, null otherwise</returns>
-    private PK8? TryGenerateWildPokemon(EncounterSlot8 slot, uint seed, EncounterCriteria criteria, ITrainerInfo tr, byte desiredForm, IVRange[] ivRanges, bool isPreEvolution = false)
+    private PK8? TryGenerateWildPokemon(EncounterSlot8 slot, uint seed, EncounterCriteria criteria, ITrainerInfo tr, ushort targetSpecies, byte desiredForm, IVRange[] ivRanges, bool isPreEvolution = false)
     {
         try
         {
-            // Generate Pokemon using the slot's ConvertToPKM
             var pk8 = slot.ConvertToPKM(tr, criteria);
 
-            // Set the encryption constant to the seed (wild encounters store seed as EC)
+            // Curry and tree-only encounters don't use the overworld seed, so we can't generate them
+            if (slot.GetRequirement(pk8) == OverworldCorrelation8Requirement.MustNotHave)
+                return null;
+
+            // The game's overworld RNG sequence: seed -> EC -> PID -> IVs -> height -> weight
             var rng = new Xoroshiro128Plus(seed);
             pk8.EncryptionConstant = (uint)rng.NextInt();
 
-            // Generate PID
             var pid = (uint)rng.NextInt();
-
-            // Check shiny type
             var xor = PKHeX.Core.ShinyUtil.GetShinyXor(pk8.ID32, pid);
             var isShiny = xor < 16;
 
-            // Handle shiny forcing based on criteria
             if (criteria.Shiny == Shiny.Never && isShiny)
             {
-                pid ^= 0x10000000; // Make non-shiny
+                pid ^= 0x10000000;
             }
             else if (criteria.Shiny != Shiny.Never && criteria.Shiny != Shiny.Random && !isShiny)
             {
-                // Force shiny (square by default)
                 var low = pid & 0xFFFF;
                 pid = (((uint)0 ^ (uint)pk8.TID16 ^ (uint)pk8.SID16 ^ low) << 16) | low;
             }
 
             pk8.PID = pid;
 
-            // Determine flawless IV count (Symbol/Fishing can have 0-3)
-            int flawless = slot.Parent.PermitCrossover || (slot.Weather & AreaWeather8.Fishing) != 0
-                ? 0 // Will validate with Overworld8RNG
-                : 0; // Hidden encounters typically have 0 flawless
-
-            // Generate IVs and track RNG state for height/weight
+            bool isSymbolOrFishing = slot.Parent.PermitCrossover || (slot.Weather & AreaWeather8.Fishing) != 0;
+            int flawless = 0;
             Span<int> ivs = stackalloc int[6];
-            ivs.Fill(-1);
             Xoroshiro128Plus finalRng = default;
+            bool foundIVs = false;
+            bool isBrilliant = false;
 
-            // For symbol/fishing, we need to try different flawless counts (0-3)
-            if (slot.Parent.PermitCrossover || (slot.Weather & AreaWeather8.Fishing) != 0)
+            // Normal spawn: no guaranteed 31 IVs, met at LevelMin
             {
-                // Try to match IVs with the wild RNG pattern
-                for (int flawlessAttempt = 0; flawlessAttempt <= 3; flawlessAttempt++)
+                var testRng = new Xoroshiro128Plus(seed);
+                testRng.NextInt(); // skip EC
+                testRng.NextInt(); // skip PID
+
+                for (int i = 0; i < 6; i++)
+                    ivs[i] = (int)testRng.NextInt(32);
+
+                if (CheckIVRangesSpan(ivs, ivRanges))
                 {
+                    finalRng = testRng;
+                    foundIVs = true;
+                }
+            }
+
+            // Brilliant aura spawn: 0/2/3 guaranteed 31 IVs, met at LevelMax
+            // Only symbol/fishing encounters can have brilliant aura
+            if (!foundIVs && isSymbolOrFishing)
+            {
+                for (int flawlessCount = 0; flawlessCount <= 3; flawlessCount++)
+                {
+                    if (flawlessCount == 1) // game never rolls exactly 1
+                        continue;
+
                     var testRng = new Xoroshiro128Plus(seed);
-                    testRng.NextInt(); // EC
-                    testRng.NextInt(); // PID
+                    testRng.NextInt(); // skip EC
+                    testRng.NextInt(); // skip PID
 
                     ivs.Fill(-1);
-                    for (int i = 0; i < flawlessAttempt; i++)
+                    for (int i = 0; i < flawlessCount; i++)
                     {
                         int index = (int)testRng.NextInt(6);
                         while (ivs[index] != -1)
@@ -1671,29 +1678,23 @@ public partial class Gen8SeedFinderForm : Form
                             ivs[i] = (int)testRng.NextInt(32);
                     }
 
-                    // Check if IVs match our criteria
                     if (CheckIVRangesSpan(ivs, ivRanges))
                     {
-                        flawless = flawlessAttempt;
-                        finalRng = testRng; // Save RNG state after IV generation
+                        flawless = flawlessCount;
+                        finalRng = testRng;
+                        foundIVs = true;
+                        isBrilliant = true;
                         break;
                     }
                 }
             }
-            else
-            {
-                // Hidden encounters - just generate random IVs
-                var testRng = new Xoroshiro128Plus(seed);
-                testRng.NextInt(); // EC
-                testRng.NextInt(); // PID
 
-                for (int i = 0; i < 6; i++)
-                    ivs[i] = (int)testRng.NextInt(32);
+            if (!foundIVs)
+                return null;
 
-                finalRng = testRng; // Save RNG state after IV generation
-            }
+            if (isBrilliant)
+                pk8.MetLevel = pk8.CurrentLevel = slot.LevelMax;
 
-            // Set IVs
             pk8.IV_HP = ivs[0];
             pk8.IV_ATK = ivs[1];
             pk8.IV_DEF = ivs[2];
@@ -1701,28 +1702,52 @@ public partial class Gen8SeedFinderForm : Form
             pk8.IV_SPD = ivs[4];
             pk8.IV_SPE = ivs[5];
 
-            // Generate Height and Weight scalars from seed (required for overworld correlation)
-            // These must be generated after IVs in the RNG sequence
-            // Each scalar requires TWO RNG calls
-            // Use the finalRng state that's already advanced past EC, PID, and IVs
+            // Height/weight come right after IVs in the RNG sequence, two calls each
             pk8.HeightScalar = (byte)(finalRng.NextInt(0x81) + finalRng.NextInt(0x80));
             pk8.WeightScalar = (byte)(finalRng.NextInt(0x81) + finalRng.NextInt(0x80));
 
-            // Check if generated IVs match our ranges
             if (!CheckIVRanges(pk8, ivRanges))
                 return null;
 
-            // Check shiny criteria
             if (criteria.IsSpecifiedShiny() && !criteria.IsSatisfiedShiny(PKHeX.Core.ShinyUtil.GetShinyXor(pk8.PID, pk8.ID32), 16))
                 return null;
 
-            // Check form
             if (!isPreEvolution && pk8.Form != desiredForm && slot.Form < EncounterUtil.FormDynamic)
                 return null;
 
-            // Calculate stats
-            pk8.ResetPartyStats();
+            // Evolve into the target species (e.g. Koffing -> Weezing-Galar)
+            if (isPreEvolution)
+            {
+                var abilitySlot = pk8.AbilityNumber;
 
+                pk8.Species = targetSpecies;
+                pk8.Form = desiredForm;
+                pk8.Nickname = SpeciesName.GetSpeciesNameGeneration(targetSpecies, pk8.Language, 8);
+
+                // Keep the same ability slot but swap to the evolved species' ability
+                var evoPI = PersonalTable.SWSH[targetSpecies, desiredForm];
+                pk8.Ability = abilitySlot switch
+                {
+                    1 => evoPI.Ability1,
+                    2 => evoPI.Ability2,
+                    4 => evoPI.AbilityH,
+                    _ => evoPI.Ability1
+                };
+
+                // Bump level to meet the evolution requirement if needed
+                var evoMethods = EvolutionTree.Evolves8.Forward.GetForward(slot.Species, slot.Form);
+                foreach (var method in evoMethods.Span)
+                {
+                    if (method.Species == targetSpecies && (method.Form == desiredForm || method.Form == 0) && method.Level > 0)
+                    {
+                        if (pk8.CurrentLevel < method.Level)
+                            pk8.CurrentLevel = method.Level;
+                        break;
+                    }
+                }
+            }
+
+            pk8.ResetPartyStats();
             return pk8;
         }
         catch
@@ -2036,13 +2061,11 @@ public partial class Gen8SeedFinderForm : Form
         public GameVersion Version { get; }
 
         /// <summary>
-        /// True if this encounter is for a pre-evolution of the selected species.
+        /// Whether this encounter belongs to a pre-evolution that can evolve into the selected species.
+        /// For example, a Koffing encounter when the user is searching for Weezing-Galar.
         /// </summary>
         public bool IsPreEvolution { get; }
 
-        /// <summary>
-        /// Initializes a new instance of the EncounterWrapper class.
-        /// </summary>
         public EncounterWrapper(object encounter, GameVersion version, bool isPreEvolution = false)
         {
             Encounter = encounter;
