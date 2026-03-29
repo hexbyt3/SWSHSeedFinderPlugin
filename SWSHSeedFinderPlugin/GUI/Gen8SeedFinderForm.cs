@@ -627,6 +627,9 @@ public partial class Gen8SeedFinderForm : Form
         }
         else // Wild Encounters
         {
+            var form = (byte)(formCombo.SelectedValue as int? ?? 0);
+            var preEvos = EvolutionTree.Evolves8.Reverse.GetPreEvolutions((ushort)species, form);
+
             // Get symbol encounters
             if (selectedSources.HasFlag(EncounterSource.Symbol))
             {
@@ -634,7 +637,18 @@ public partial class Gen8SeedFinderForm : Form
                 var symbolSH = GetWildEncounters((ushort)species, GameVersion.SH, true);
                 encounters.AddRange(symbolSW.Select(e => new EncounterWrapper(e, GameVersion.SW)));
                 encounters.AddRange(symbolSH.Select(e => new EncounterWrapper(e, GameVersion.SH)));
-                if (symbolSW.Count > 0 || symbolSH.Count > 0)
+                bool found = symbolSW.Count > 0 || symbolSH.Count > 0;
+
+                foreach (var (preSpecies, _) in preEvos)
+                {
+                    var preSW = GetWildEncounters(preSpecies, GameVersion.SW, true);
+                    var preSH = GetWildEncounters(preSpecies, GameVersion.SH, true);
+                    encounters.AddRange(preSW.Select(e => new EncounterWrapper(e, GameVersion.SW, true)));
+                    encounters.AddRange(preSH.Select(e => new EncounterWrapper(e, GameVersion.SH, true)));
+                    found |= preSW.Count > 0 || preSH.Count > 0;
+                }
+
+                if (found)
                     _availableSources |= EncounterSource.Symbol;
             }
 
@@ -645,7 +659,18 @@ public partial class Gen8SeedFinderForm : Form
                 var hiddenSH = GetWildEncounters((ushort)species, GameVersion.SH, false);
                 encounters.AddRange(hiddenSW.Select(e => new EncounterWrapper(e, GameVersion.SW)));
                 encounters.AddRange(hiddenSH.Select(e => new EncounterWrapper(e, GameVersion.SH)));
-                if (hiddenSW.Count > 0 || hiddenSH.Count > 0)
+                bool found = hiddenSW.Count > 0 || hiddenSH.Count > 0;
+
+                foreach (var (preSpecies, _) in preEvos)
+                {
+                    var preSW = GetWildEncounters(preSpecies, GameVersion.SW, false);
+                    var preSH = GetWildEncounters(preSpecies, GameVersion.SH, false);
+                    encounters.AddRange(preSW.Select(e => new EncounterWrapper(e, GameVersion.SW, true)));
+                    encounters.AddRange(preSH.Select(e => new EncounterWrapper(e, GameVersion.SH, true)));
+                    found |= preSW.Count > 0 || preSH.Count > 0;
+                }
+
+                if (found)
                     _availableSources |= EncounterSource.Hidden;
             }
         }
@@ -697,7 +722,7 @@ public partial class Gen8SeedFinderForm : Form
 
         var form = (byte)(formCombo.SelectedValue as int? ?? 0);
         var groupedEncounters = _cachedEncounters
-            .Where(e => e.Form == form || e.Form >= EncounterUtil.FormDynamic)
+            .Where(e => e.IsPreEvolution || e.Form == form || e.Form >= EncounterUtil.FormDynamic)
             .GroupBy(e => e.GetDescription())
             .Select((g, i) => new { Description = g.Key, Index = i })
             .ToList();
@@ -1202,7 +1227,7 @@ public partial class Gen8SeedFinderForm : Form
                             continue;
 
                         // Try to generate wild Pokemon
-                        var pk = TryGenerateWildPokemon(slot, currentSeed, criteria, tr, form, ivRanges);
+                        var pk = TryGenerateWildPokemon(slot, currentSeed, criteria, tr, form, ivRanges, wrapper.IsPreEvolution);
                         if (pk == null)
                             continue;
 
@@ -1500,10 +1525,10 @@ public partial class Gen8SeedFinderForm : Form
     {
         if (encounterIndex == -1)
         {
-            return _cachedEncounters.Where(e => e.Form == form || e.Form >= EncounterUtil.FormDynamic).ToList();
+            return _cachedEncounters.Where(e => e.IsPreEvolution || e.Form == form || e.Form >= EncounterUtil.FormDynamic).ToList();
         }
 
-        return _cachedEncounters.Where(e => e.GetDescription() == selectedEncounterText && (e.Form == form || e.Form >= EncounterUtil.FormDynamic)).ToList();
+        return _cachedEncounters.Where(e => e.GetDescription() == selectedEncounterText && (e.IsPreEvolution || e.Form == form || e.Form >= EncounterUtil.FormDynamic)).ToList();
     }
 
     /// <summary>
@@ -1579,7 +1604,7 @@ public partial class Gen8SeedFinderForm : Form
     /// <param name="desiredForm">Desired form</param>
     /// <param name="ivRanges">IV ranges to validate</param>
     /// <returns>Generated PK8 if successful, null otherwise</returns>
-    private PK8? TryGenerateWildPokemon(EncounterSlot8 slot, uint seed, EncounterCriteria criteria, ITrainerInfo tr, byte desiredForm, IVRange[] ivRanges)
+    private PK8? TryGenerateWildPokemon(EncounterSlot8 slot, uint seed, EncounterCriteria criteria, ITrainerInfo tr, byte desiredForm, IVRange[] ivRanges, bool isPreEvolution = false)
     {
         try
         {
@@ -1692,7 +1717,7 @@ public partial class Gen8SeedFinderForm : Form
                 return null;
 
             // Check form
-            if (pk8.Form != desiredForm && slot.Form < EncounterUtil.FormDynamic)
+            if (!isPreEvolution && pk8.Form != desiredForm && slot.Form < EncounterUtil.FormDynamic)
                 return null;
 
             // Calculate stats
@@ -2011,14 +2036,18 @@ public partial class Gen8SeedFinderForm : Form
         public GameVersion Version { get; }
 
         /// <summary>
+        /// True if this encounter is for a pre-evolution of the selected species.
+        /// </summary>
+        public bool IsPreEvolution { get; }
+
+        /// <summary>
         /// Initializes a new instance of the EncounterWrapper class.
         /// </summary>
-        /// <param name="encounter">Encounter to wrap</param>
-        /// <param name="version">Game version</param>
-        public EncounterWrapper(object encounter, GameVersion version)
+        public EncounterWrapper(object encounter, GameVersion version, bool isPreEvolution = false)
         {
             Encounter = encounter;
             Version = version;
+            IsPreEvolution = isPreEvolution;
         }
 
         /// <summary>
@@ -2051,7 +2080,7 @@ public partial class Gen8SeedFinderForm : Form
                 EncounterStatic8NC => "Crystal Den",
                 EncounterStatic8ND nd => $"{GetVersionString()} Event #{nd.Index}",
                 EncounterStatic8U => "Max Lair",
-                EncounterSlot8 s => $"{GetVersionString()} {GetSlotTypeString(s)} - Location {s.Location}",
+                EncounterSlot8 s => $"{GetVersionString()} {GetSlotTypeString(s)} - Location {s.Location}{(IsPreEvolution ? $" (as {GameInfo.Strings.specieslist[s.Species]})" : "")}",
                 _ => "Unknown"
             };
         }
@@ -2068,7 +2097,7 @@ public partial class Gen8SeedFinderForm : Form
                 EncounterStatic8NC => "Crystal",
                 EncounterStatic8ND => $"{GetVersionString()} Event",
                 EncounterStatic8U => "Max Lair",
-                EncounterSlot8 s => $"{GetVersionString()} {GetSlotTypeString(s)}",
+                EncounterSlot8 s => $"{GetVersionString()} {GetSlotTypeString(s)}{(IsPreEvolution ? $" (as {GameInfo.Strings.specieslist[s.Species]})" : "")}",
                 _ => "?"
             };
         }
