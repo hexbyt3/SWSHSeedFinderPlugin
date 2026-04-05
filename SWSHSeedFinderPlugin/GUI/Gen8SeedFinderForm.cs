@@ -992,11 +992,7 @@ public partial class Gen8SeedFinderForm : Form
     {
         return shinyCombo.SelectedIndex switch
         {
-            0 => Shiny.Random,
-            1 => Shiny.Never,
-            2 => Shiny.Always,
-            3 => Shiny.AlwaysSquare,
-            4 => Shiny.AlwaysStar,
+            1 => Shiny.Always,
             _ => Shiny.Random
         };
     }
