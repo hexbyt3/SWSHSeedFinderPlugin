@@ -752,10 +752,42 @@ public partial class Gen8SeedFinderForm : Form
 
         items.AddRange(groupedEncounters.Select(g => new ComboItem(g.Description, g.Index)));
 
+        encounterCombo.SelectedIndexChanged -= EncounterCombo_SelectedIndexChanged;
         encounterCombo.DisplayMember = "Text";
         encounterCombo.ValueMember = "Value";
         encounterCombo.DataSource = items;
         encounterCombo.SelectedIndex = 0;
+        encounterCombo.SelectedIndexChanged += EncounterCombo_SelectedIndexChanged;
+        UpdateShinyLock();
+    }
+
+    private void EncounterCombo_SelectedIndexChanged(object? sender, EventArgs e)
+    {
+        UpdateShinyLock();
+    }
+
+    private void UpdateShinyLock()
+    {
+        var encounterText = (encounterCombo.SelectedItem as ComboItem)?.Text;
+        if (string.IsNullOrEmpty(encounterText) || encounterText == "All Encounters")
+        {
+            shinyCombo.Enabled = true;
+            return;
+        }
+
+        var form = (byte)(formCombo.SelectedValue as int? ?? 0);
+        var match = _cachedEncounters
+            .FirstOrDefault(e => e.GetDescription() == encounterText && (e.IsPreEvolution || e.Form == form || e.Form >= EncounterUtil.FormDynamic));
+
+        if (match != null && match.Shiny == Shiny.Never)
+        {
+            shinyCombo.SelectedIndex = 0; // No
+            shinyCombo.Enabled = false;
+        }
+        else
+        {
+            shinyCombo.Enabled = true;
+        }
     }
 
     /// <summary>
@@ -2116,6 +2148,16 @@ public partial class Gen8SeedFinderForm : Form
             EncounterStatic8U u => u.Form,
             EncounterSlot8 s => s.Form,
             _ => 0
+        };
+
+        public Shiny Shiny => Encounter switch
+        {
+            EncounterStatic8N n => n.Shiny,
+            EncounterStatic8NC nc => nc.Shiny,
+            EncounterStatic8ND nd => nd.Shiny,
+            EncounterStatic8U u => u.Shiny,
+            EncounterSlot8 s => s.Shiny,
+            _ => Shiny.Random
         };
 
         /// <summary>
