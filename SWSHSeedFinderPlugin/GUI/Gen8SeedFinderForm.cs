@@ -548,6 +548,7 @@ public partial class Gen8SeedFinderForm : Form
         UpdateEncounterList(species);
         UpdateSourceDisplay();
         UpdateEncounterCombo();
+        UpdateAbilityList();
     }
 
     /// <summary>
@@ -556,6 +557,27 @@ public partial class Gen8SeedFinderForm : Form
     private void FormCombo_SelectedIndexChanged(object? sender, EventArgs e)
     {
         UpdateEncounterCombo();
+        UpdateAbilityList();
+    }
+
+    private void UpdateAbilityList()
+    {
+        var species = speciesCombo.SelectedValue as int? ?? 0;
+        var form = (byte)(formCombo.SelectedValue as int? ?? 0);
+        var pi = PersonalTable.SWSH[(ushort)species, form];
+        var names = GameInfo.Strings.abilitylist;
+
+        var savedIndex = abilityCombo.SelectedIndex;
+        abilityCombo.Items.Clear();
+        abilityCombo.Items.AddRange(new object[]
+        {
+            "Any",
+            $"{names[pi.Ability1]} (1)",
+            $"{names[pi.Ability2]} (2)",
+            $"{names[pi.AbilityH]} (H)",
+            "1/2",
+        });
+        abilityCombo.SelectedIndex = Math.Clamp(savedIndex, 0, abilityCombo.Items.Count - 1);
     }
 
     /// <summary>
