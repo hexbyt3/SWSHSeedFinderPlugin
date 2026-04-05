@@ -1319,24 +1319,35 @@ public partial class Gen8SeedFinderForm : Form
 
         uint pid;
         bool isShiny;
+        bool isMaxLair = encounter is EncounterStatic8U;
         {
             var trID = (uint)rng.NextInt(); // Generated OTID from seed
             pid = (uint)rng.NextInt();
             var xor = PKHeX.Core.ShinyUtil.GetShinyXor(pid, trID);
             isShiny = xor < 16;
+
+            // Max Lair encounters are generated as Shiny.Never — force non-shiny relative to trID
+            if (isShiny && param.Shiny == Shiny.Never)
+            {
+                PKHeX.Core.ShinyUtil.ForceShinyState(false, ref pid, trID, 0);
+                isShiny = false;
+            }
         }
 
         // Adjust PID to match player's actual ID32 (preserving shiny/non-shiny state from seed)
-        // xorType 0 = square shiny, 1 = star shiny (using 0 as default since we'll check the actual XOR)
         PKHeX.Core.ShinyUtil.ForceShinyState(isShiny, ref pid, tr.ID32, 0);
 
-        // Calculate final shiny XOR with player's actual ID
-        var finalShinyXor = PKHeX.Core.ShinyUtil.GetShinyXor(pid, tr.ID32);
-        var finalIsShiny = finalShinyXor < 16;
+        // Max Lair shininess is applied independently of the seed (any seed can be shiny).
+        // Skip the shiny criteria check here; it will be applied during full generation.
+        if (!isMaxLair)
+        {
+            // Calculate final shiny XOR with player's actual ID
+            var finalShinyXor = PKHeX.Core.ShinyUtil.GetShinyXor(pid, tr.ID32);
 
-        // Check shiny criteria (now based on player's actual ID)
-        if (criteria.IsSpecifiedShiny() && !criteria.IsSatisfiedShiny(finalShinyXor, 16))
-            return false;
+            // Check shiny criteria (now based on player's actual ID)
+            if (criteria.IsSpecifiedShiny() && !criteria.IsSatisfiedShiny(finalShinyXor, 16))
+                return false;
+        }
 
         // Quick IV check
         Span<int> ivs = stackalloc int[6];
@@ -1561,6 +1572,9 @@ public partial class Gen8SeedFinderForm : Form
                 case EncounterStatic8U u:
                     pk8 = u.ConvertToPKM(tr, criteria);
                     u.GenerateSeed64(pk8, seed);
+                    // Max Lair shininess is independent of the seed — apply star shiny (XOR=1) if requested
+                    if (criteria.Shiny.IsShiny())
+                        pk8.PID = PKHeX.Core.ShinyUtil.GetShinyPID(pk8.TID16, pk8.SID16, pk8.PID, 1);
                     break;
             }
 
