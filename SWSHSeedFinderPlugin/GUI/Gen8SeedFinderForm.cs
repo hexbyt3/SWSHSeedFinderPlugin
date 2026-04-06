@@ -940,6 +940,7 @@ public partial class Gen8SeedFinderForm : Form
         var encounterIndex = encounterCombo.SelectedValue as int? ?? -1;
         var selectedEncounterText = (encounterCombo.SelectedItem as ComboItem)?.Text;
         var ivRanges = GetIVRanges();
+        var sizeFilter = GetSizeFilter();
         var maxResults = (int)maxSeedsNum.Value;
 
         lock (_resultsLock)
@@ -963,7 +964,7 @@ public partial class Gen8SeedFinderForm : Form
 
         try
         {
-            await Task.Run(() => SearchSeeds(species, form, criteria, encounterIndex, selectedEncounterText, ivRanges, maxResults, _searchCts.Token));
+            await Task.Run(() => SearchSeeds(species, form, criteria, encounterIndex, selectedEncounterText, ivRanges, sizeFilter, maxResults, _searchCts.Token));
         }
         catch (OperationCanceledException)
         {
@@ -988,6 +989,17 @@ public partial class Gen8SeedFinderForm : Form
     /// Represents an IV range with minimum and maximum values.
     /// </summary>
     private record struct IVRange(int Min, int Max);
+
+    private record struct SizeFilter(byte HeightMin, byte HeightMax, byte WeightMin, byte WeightMax)
+    {
+        public static SizeFilter Any => new(0, 255, 0, 255);
+
+        public bool IsAny => HeightMin == 0 && HeightMax == 255 && WeightMin == 0 && WeightMax == 255;
+
+        public bool Matches(byte height, byte weight) =>
+            height >= HeightMin && height <= HeightMax &&
+            weight >= WeightMin && weight <= WeightMax;
+    }
 
     /// <summary>
     /// Gets the encounter criteria from the UI controls.
@@ -1046,6 +1058,24 @@ public partial class Gen8SeedFinderForm : Form
         ];
     }
 
+    private SizeFilter GetSizeFilter()
+    {
+        var (hMin, hMax) = GetSizeBucketRange(sizeHeightCombo.SelectedIndex);
+        var (wMin, wMax) = GetSizeBucketRange(sizeWeightCombo.SelectedIndex);
+        return new SizeFilter(hMin, hMax, wMin, wMax);
+    }
+
+    // Buckets line up with PokeSizeUtil.GetSizeRating so the dropdown matches what PKHeX displays.
+    private static (byte Min, byte Max) GetSizeBucketRange(int index) => index switch
+    {
+        1 => (0x00, 0x0F), // XS
+        2 => (0x10, 0x2F), // S
+        3 => (0x30, 0xCF), // M
+        4 => (0xD0, 0xEF), // L
+        5 => (0xF0, 0xFF), // XL
+        _ => (0x00, 0xFF),
+    };
+
     /// <summary>
     /// Gets the selected ability permission from the UI.
     /// </summary>
@@ -1099,7 +1129,7 @@ public partial class Gen8SeedFinderForm : Form
     /// <param name="ivRanges">IV ranges to search for</param>
     /// <param name="maxResults">Maximum number of results</param>
     /// <param name="token">Cancellation token</param>
-    private void SearchSeeds(int species, byte form, EncounterCriteria criteria, int encounterIndex, string? selectedEncounterText, IVRange[] ivRanges, int maxResults, CancellationToken token)
+    private void SearchSeeds(int species, byte form, EncounterCriteria criteria, int encounterIndex, string? selectedEncounterText, IVRange[] ivRanges, SizeFilter sizeFilter, int maxResults, CancellationToken token)
     {
         var results = new List<SeedResult>();
 
@@ -1116,12 +1146,12 @@ public partial class Gen8SeedFinderForm : Form
         if (isWildSearch)
         {
             // Wild encounters use 32-bit seeds
-            SearchWildSeeds((ushort)species, form, criteria, ivRanges, maxResults, token, (uint)startSeed, (uint)endSeed, tr, encountersToCheck, results);
+            SearchWildSeeds((ushort)species, form, criteria, ivRanges, sizeFilter, maxResults, token, (uint)startSeed, (uint)endSeed, tr, encountersToCheck, results);
         }
         else
         {
             // Raid encounters use 64-bit seeds
-            SearchRaidSeeds(form, criteria, ivRanges, maxResults, token, startSeed, endSeed, tr, encountersToCheck, results);
+            SearchRaidSeeds(form, criteria, ivRanges, sizeFilter, maxResults, token, startSeed, endSeed, tr, encountersToCheck, results);
         }
 
         lock (_resultsLock)
@@ -1149,7 +1179,7 @@ public partial class Gen8SeedFinderForm : Form
     /// <summary>
     /// Searches for raid seeds (64-bit).
     /// </summary>
-    private void SearchRaidSeeds(byte form, EncounterCriteria criteria, IVRange[] ivRanges, int maxResults, CancellationToken token, ulong startSeed, ulong endSeed, ITrainerInfo tr, List<EncounterWrapper> encountersToCheck, List<SeedResult> results)
+    private void SearchRaidSeeds(byte form, EncounterCriteria criteria, IVRange[] ivRanges, SizeFilter sizeFilter, int maxResults, CancellationToken token, ulong startSeed, ulong endSeed, ITrainerInfo tr, List<EncounterWrapper> encountersToCheck, List<SeedResult> results)
     {
         ulong totalSeeds = endSeed - startSeed + 1;
         ulong seedsChecked = 0;
@@ -1189,6 +1219,9 @@ public partial class Gen8SeedFinderForm : Form
                         // Verify generated Pokemon matches all criteria (nature, shiny, gender, IVs)
                         // GenerateSeed64 overwrites PINGA from the seed, so we must re-check
                         if (!CheckPokemonMatchesCriteria(pk, criteria, ivRanges))
+                            continue;
+
+                        if (!sizeFilter.IsAny && !sizeFilter.Matches(pk.HeightScalar, pk.WeightScalar))
                             continue;
 
                         var result = new SeedResult
@@ -1243,7 +1276,7 @@ public partial class Gen8SeedFinderForm : Form
         }
     }
 
-    private void SearchWildSeeds(ushort targetSpecies, byte form, EncounterCriteria criteria, IVRange[] ivRanges, int maxResults, CancellationToken token, uint startSeed, uint endSeed, ITrainerInfo tr, List<EncounterWrapper> encountersToCheck, List<SeedResult> results)
+    private void SearchWildSeeds(ushort targetSpecies, byte form, EncounterCriteria criteria, IVRange[] ivRanges, SizeFilter sizeFilter, int maxResults, CancellationToken token, uint startSeed, uint endSeed, ITrainerInfo tr, List<EncounterWrapper> encountersToCheck, List<SeedResult> results)
     {
         uint totalSeeds = endSeed - startSeed + 1;
         uint seedsChecked = 0;
@@ -1275,7 +1308,7 @@ public partial class Gen8SeedFinderForm : Form
                             continue;
 
                         // Try to generate wild Pokemon
-                        var pk = TryGenerateWildPokemon(slot, currentSeed, criteria, tr, targetSpecies, form, ivRanges, wrapper.IsPreEvolution);
+                        var pk = TryGenerateWildPokemon(slot, currentSeed, criteria, tr, targetSpecies, form, ivRanges, sizeFilter, wrapper.IsPreEvolution);
                         if (pk == null)
                             continue;
 
@@ -1661,7 +1694,7 @@ public partial class Gen8SeedFinderForm : Form
     /// matching the overworld RNG sequence that PKHeX validates (Overworld8RNG).
     /// If the encounter is for a pre-evolution, the result is evolved into the target species.
     /// </summary>
-    private PK8? TryGenerateWildPokemon(EncounterSlot8 slot, uint seed, EncounterCriteria criteria, ITrainerInfo tr, ushort targetSpecies, byte desiredForm, IVRange[] ivRanges, bool isPreEvolution = false)
+    private PK8? TryGenerateWildPokemon(EncounterSlot8 slot, uint seed, EncounterCriteria criteria, ITrainerInfo tr, ushort targetSpecies, byte desiredForm, IVRange[] ivRanges, SizeFilter sizeFilter, bool isPreEvolution = false)
     {
         try
         {
@@ -1769,6 +1802,9 @@ public partial class Gen8SeedFinderForm : Form
             // Height/weight come right after IVs in the RNG sequence, two calls each
             pk8.HeightScalar = (byte)(finalRng.NextInt(0x81) + finalRng.NextInt(0x80));
             pk8.WeightScalar = (byte)(finalRng.NextInt(0x81) + finalRng.NextInt(0x80));
+
+            if (!sizeFilter.IsAny && !sizeFilter.Matches(pk8.HeightScalar, pk8.WeightScalar))
+                return null;
 
             if (!CheckIVRanges(pk8, ivRanges))
                 return null;

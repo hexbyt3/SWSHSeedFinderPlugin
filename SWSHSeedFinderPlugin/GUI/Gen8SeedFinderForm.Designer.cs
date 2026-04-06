@@ -89,6 +89,12 @@ namespace SWSHSeedFinderPlugin.GUI
             this.ivMinLabel = new System.Windows.Forms.Label();
             this.ivMaxLabel = new System.Windows.Forms.Label();
 
+            this.sizeGroup = new System.Windows.Forms.GroupBox();
+            this.sizeHeightLabel = new System.Windows.Forms.Label();
+            this.sizeHeightCombo = new System.Windows.Forms.ComboBox();
+            this.sizeWeightLabel = new System.Windows.Forms.Label();
+            this.sizeWeightCombo = new System.Windows.Forms.ComboBox();
+
             this.searchOptionsGroup = new System.Windows.Forms.GroupBox();
             this.maxSeedsLabel = new System.Windows.Forms.Label();
             this.maxSeedsNum = new System.Windows.Forms.NumericUpDown();
@@ -119,6 +125,7 @@ namespace SWSHSeedFinderPlugin.GUI
             ((System.ComponentModel.ISupportInitialize)(this.tidNum)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.sidNum)).BeginInit();
             this.ivGroup.SuspendLayout();
+            this.sizeGroup.SuspendLayout();
             this.searchOptionsGroup.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.ivHpMin)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.ivHpMax)).BeginInit();
@@ -170,6 +177,7 @@ namespace SWSHSeedFinderPlugin.GUI
             // searchPanel
             this.searchPanel.AutoScroll = true;
             this.searchPanel.Controls.Add(this.searchOptionsGroup);
+            this.searchPanel.Controls.Add(this.sizeGroup);
             this.searchPanel.Controls.Add(this.ivGroup);
             this.searchPanel.Controls.Add(this.criteriaGroup);
             this.searchPanel.Controls.Add(this.encounterGroup);
@@ -709,6 +717,66 @@ namespace SWSHSeedFinderPlugin.GUI
             this.ivSpeMax.TabIndex = 19;
             this.ivSpeMax.Value = new decimal(new int[] { 31, 0, 0, 0 });
 
+            // sizeGroup
+            this.sizeGroup.Controls.Add(this.sizeWeightCombo);
+            this.sizeGroup.Controls.Add(this.sizeWeightLabel);
+            this.sizeGroup.Controls.Add(this.sizeHeightCombo);
+            this.sizeGroup.Controls.Add(this.sizeHeightLabel);
+            this.sizeGroup.Location = new System.Drawing.Point(8, 547);
+            this.sizeGroup.Name = "sizeGroup";
+            this.sizeGroup.Size = new System.Drawing.Size(360, 60);
+            this.sizeGroup.TabIndex = 5;
+            this.sizeGroup.TabStop = false;
+            this.sizeGroup.Text = "Size Filter (Height / Weight Scalar)";
+
+            // sizeHeightLabel
+            this.sizeHeightLabel.AutoSize = true;
+            this.sizeHeightLabel.Location = new System.Drawing.Point(10, 28);
+            this.sizeHeightLabel.Name = "sizeHeightLabel";
+            this.sizeHeightLabel.Size = new System.Drawing.Size(45, 15);
+            this.sizeHeightLabel.TabIndex = 0;
+            this.sizeHeightLabel.Text = "Height:";
+
+            // sizeHeightCombo
+            this.sizeHeightCombo.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.sizeHeightCombo.FormattingEnabled = true;
+            this.sizeHeightCombo.Items.AddRange(new object[] {
+                "Any",
+                "XS  (0–15)",
+                "S   (16–47)",
+                "M   (48–207)",
+                "L   (208–239)",
+                "XL  (240–255)"});
+            this.sizeHeightCombo.Location = new System.Drawing.Point(60, 25);
+            this.sizeHeightCombo.Name = "sizeHeightCombo";
+            this.sizeHeightCombo.Size = new System.Drawing.Size(110, 23);
+            this.sizeHeightCombo.TabIndex = 1;
+            this.sizeHeightCombo.SelectedIndex = 0;
+
+            // sizeWeightLabel
+            this.sizeWeightLabel.AutoSize = true;
+            this.sizeWeightLabel.Location = new System.Drawing.Point(180, 28);
+            this.sizeWeightLabel.Name = "sizeWeightLabel";
+            this.sizeWeightLabel.Size = new System.Drawing.Size(48, 15);
+            this.sizeWeightLabel.TabIndex = 2;
+            this.sizeWeightLabel.Text = "Weight:";
+
+            // sizeWeightCombo
+            this.sizeWeightCombo.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.sizeWeightCombo.FormattingEnabled = true;
+            this.sizeWeightCombo.Items.AddRange(new object[] {
+                "Any",
+                "XS  (0–15)",
+                "S   (16–47)",
+                "M   (48–207)",
+                "L   (208–239)",
+                "XL  (240–255)"});
+            this.sizeWeightCombo.Location = new System.Drawing.Point(235, 25);
+            this.sizeWeightCombo.Name = "sizeWeightCombo";
+            this.sizeWeightCombo.Size = new System.Drawing.Size(115, 23);
+            this.sizeWeightCombo.TabIndex = 3;
+            this.sizeWeightCombo.SelectedIndex = 0;
+
             // searchOptionsGroup
             this.searchOptionsGroup.Controls.Add(this.exportButton);
             this.searchOptionsGroup.Controls.Add(this.searchButton);
@@ -718,10 +786,10 @@ namespace SWSHSeedFinderPlugin.GUI
             this.searchOptionsGroup.Controls.Add(this.startSeedLabel);
             this.searchOptionsGroup.Controls.Add(this.maxSeedsNum);
             this.searchOptionsGroup.Controls.Add(this.maxSeedsLabel);
-            this.searchOptionsGroup.Location = new System.Drawing.Point(8, 547);
+            this.searchOptionsGroup.Location = new System.Drawing.Point(8, 615);
             this.searchOptionsGroup.Name = "searchOptionsGroup";
             this.searchOptionsGroup.Size = new System.Drawing.Size(360, 150);
-            this.searchOptionsGroup.TabIndex = 5;
+            this.searchOptionsGroup.TabIndex = 6;
             this.searchOptionsGroup.TabStop = false;
             this.searchOptionsGroup.Text = "Search Options";
 
@@ -892,6 +960,8 @@ namespace SWSHSeedFinderPlugin.GUI
             ((System.ComponentModel.ISupportInitialize)(this.sidNum)).EndInit();
             this.ivGroup.ResumeLayout(false);
             this.ivGroup.PerformLayout();
+            this.sizeGroup.ResumeLayout(false);
+            this.sizeGroup.PerformLayout();
             this.searchOptionsGroup.ResumeLayout(false);
             this.searchOptionsGroup.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.ivHpMin)).EndInit();
@@ -979,6 +1049,12 @@ namespace SWSHSeedFinderPlugin.GUI
         private System.Windows.Forms.Label ivSpeLabel;
         private System.Windows.Forms.NumericUpDown ivSpeMin;
         private System.Windows.Forms.NumericUpDown ivSpeMax;
+
+        private System.Windows.Forms.GroupBox sizeGroup;
+        private System.Windows.Forms.Label sizeHeightLabel;
+        private System.Windows.Forms.ComboBox sizeHeightCombo;
+        private System.Windows.Forms.Label sizeWeightLabel;
+        private System.Windows.Forms.ComboBox sizeWeightCombo;
 
         private System.Windows.Forms.GroupBox searchOptionsGroup;
         private System.Windows.Forms.Label maxSeedsLabel;
