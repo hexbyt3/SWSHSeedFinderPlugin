@@ -1678,6 +1678,9 @@ public partial class Gen8SeedFinderForm : Form
                 return null;
             }
 
+            // Apply a legal ball matching the Pokémon's color (PKHeX built-in behavior)
+            BallApplicator.ApplyBallLegalByColor(pk8);
+
             // Ensure stats are calculated
             pk8.ResetPartyStats();
 
@@ -1846,6 +1849,9 @@ public partial class Gen8SeedFinderForm : Form
                     }
                 }
             }
+
+            // Apply a legal ball matching the Pokémon's color (PKHeX built-in behavior)
+            BallApplicator.ApplyBallLegalByColor(pk8);
 
             pk8.ResetPartyStats();
             return pk8;
