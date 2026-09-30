@@ -1642,19 +1642,19 @@ public partial class Gen8SeedFinderForm : Form
             {
                 case EncounterStatic8N n:
                     pk8 = n.ConvertToPKM(tr, criteria);
-                    n.GenerateSeed64(pk8, seed);
+                    n.GenerateSeed64(pk8, tr, seed);
                     break;
                 case EncounterStatic8NC nc:
                     pk8 = nc.ConvertToPKM(tr, criteria);
-                    nc.GenerateSeed64(pk8, seed);
+                    nc.GenerateSeed64(pk8, tr, seed);
                     break;
                 case EncounterStatic8ND nd:
                     pk8 = nd.ConvertToPKM(tr, criteria);
-                    nd.GenerateSeed64(pk8, seed);
+                    nd.GenerateSeed64(pk8, tr, seed);
                     break;
                 case EncounterStatic8U u:
                     pk8 = u.ConvertToPKM(tr, criteria);
-                    u.GenerateSeed64(pk8, seed);
+                    u.GenerateSeed64(pk8, tr, seed);
                     // Max Lair shininess is independent of the seed — apply star shiny (XOR=1) if requested
                     if (criteria.Shiny.IsShiny())
                         pk8.PID = PKHeX.Core.ShinyUtil.GetShinyPID(pk8.TID16, pk8.SID16, pk8.PID, 1);
