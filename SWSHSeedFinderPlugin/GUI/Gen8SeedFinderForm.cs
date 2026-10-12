@@ -1484,9 +1484,9 @@ public partial class Gen8SeedFinderForm : Form
         }
 
         // Check nature if specified
-        if (criteria.Nature.IsFixed())
+        if (criteria.Nature.IsFixed)
         {
-            var nature = param.Nature.IsFixed() ? param.Nature : (Nature)rng.NextInt(25);
+            var nature = param.Nature.IsFixed ? param.Nature : (Nature)rng.NextInt(25);
             if (nature != criteria.Nature)
                 return false;
         }
@@ -1880,7 +1880,7 @@ public partial class Gen8SeedFinderForm : Form
             return false;
 
         // Check nature
-        if (criteria.Nature.IsFixed() && pk.Nature != criteria.Nature)
+        if (criteria.Nature.IsFixed && pk.Nature != criteria.Nature)
             return false;
 
         // Check IVs
