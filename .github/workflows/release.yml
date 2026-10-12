@@ -10,6 +10,7 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
+    if: github.ref_name == github.event.repository.default_branch   # manual runs too
     steps:
       - uses: actions/checkout@v4
       - name: Setup .NET
@@ -27,12 +28,23 @@ jobs:
           $dll = "SWSHSeedFinderPlugin/Deps/PKHeX.Core.dll"
           $version = [System.Reflection.Assembly]::LoadFrom((Resolve-Path $dll)).GetName().Version
           $versionString = "$($version.Major).$($version.Minor).$($version.Build)"
+          # A Core rebuild at the same version gets v<ver>-Rev.N instead of
+          # re-pointing the existing v<ver> release.
+          git fetch --tags
+          $maxRev = 0
+          $hasBaseTag = $false
+          foreach ($tag in (git tag -l "v$versionString*")) {
+            if ($tag -eq "v$versionString") { $hasBaseTag = $true }
+            elseif ($tag -match "^v$([regex]::Escape($versionString))-Rev\.(\d+)$") { $maxRev = [Math]::Max($maxRev, [int]$matches[1]) }
+          }
+          $tagName = if ($hasBaseTag) { "v$versionString-Rev.$($maxRev + 1)" } else { "v$versionString" }
           echo "version=$versionString" >> $env:GITHUB_OUTPUT
+          echo "tag=$tagName" >> $env:GITHUB_OUTPUT
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: "v${{ steps.ver.outputs.version }}"
-          name: "SWSH Seed Finder ${{ steps.ver.outputs.version }}"
+          tag_name: "${{ steps.ver.outputs.tag }}"
+          name: "SWSH Seed Finder ${{ steps.ver.outputs.tag }}"
           body: "Automated release for version ${{ steps.ver.outputs.version }}"
           files: |
             SWSHSeedFinderPlugin/bin/Release/net10.0-windows/SWSHSeedFinderPlugin.dll
